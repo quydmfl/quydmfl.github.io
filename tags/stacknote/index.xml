@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Stacknote on Quy Duong Minh — Software Engineer</title><link>https://quydmfl.github.io/tags/stacknote/</link><description>Recent content in Stacknote on Quy Duong Minh — Software Engineer</description><generator>Hugo</generator><language>vi-VN</language><lastBuildDate>Wed, 09 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://quydmfl.github.io/tags/stacknote/index.xml" rel="self" type="application/rss+xml"/><item><title>Hello, Stacknote</title><link>https://quydmfl.github.io/articles/hello-stacknote/</link><pubDate>Wed, 09 Sep 2026 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/articles/hello-stacknote/</guid><description>&lt;h1 id="hello-stacknote"&gt;Hello, Stacknote&lt;/h1&gt;
+&lt;p&gt;Đây là bài viết đầu tiên trên blog của tôi.&lt;/p&gt;
+&lt;h2 id="tôi-viết-blog-để-làm-gì"&gt;Tôi viết blog để làm gì?&lt;/h2&gt;
+&lt;p&gt;Tôi muốn ghi lại những gì mình học được trong quá trình xây dựng phần mềm.&lt;/p&gt;
+&lt;h2 id="những-chủ-đề-tôi-quan-tâm"&gt;Những chủ đề tôi quan tâm&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Backend&lt;/li&gt;
+&lt;li&gt;Distributed Systems&lt;/li&gt;
+&lt;li&gt;DevOps&lt;/li&gt;
+&lt;li&gt;AI&lt;/li&gt;
+&lt;li&gt;Databases&lt;/li&gt;
+&lt;li&gt;Linux&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="một-đoạn-code"&gt;Một đoạn code&lt;/h2&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-go" data-lang="go"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;package&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;main&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;import&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;fmt&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;func&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;main&lt;/span&gt;() {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;fmt&lt;/span&gt;.&lt;span style="color:#a6e22e"&gt;Println&lt;/span&gt;(&lt;span style="color:#e6db74"&gt;&amp;#34;Hello, Stacknote!&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;</description></item></channel></rss>

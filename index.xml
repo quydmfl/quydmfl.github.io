@@ -8,15 +8,4 @@
 &lt;h2 id="vì-sao-dùng-override-file-thay-vì-sửa-docker-composeyml-gốc"&gt;Vì sao dùng override file thay vì sửa &lt;code&gt;docker-compose.yml&lt;/code&gt; gốc?&lt;/h2&gt;
 &lt;p&gt;&lt;code&gt;docker-compose.grafana.yml&lt;/code&gt; đi kèm bài này &lt;strong&gt;không&lt;/strong&gt; thay thế file ở bài 03 — nó là một &lt;strong&gt;override file&lt;/strong&gt;, gộp thêm service &lt;code&gt;grafana&lt;/code&gt; vào stack đang chạy:&lt;/p&gt;</description></item><item><title>07. Đưa hệ thống lên Production</title><link>https://quydmfl.github.io/articles/victoria-logs-series/07-production/</link><pubDate>Wed, 16 Sep 2026 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/articles/victoria-logs-series/07-production/</guid><description>&lt;p&gt;Sáu bài trước dựng được một stack chạy tốt trên một máy dev. Bài cuối này trả lời câu hỏi: chạy &lt;strong&gt;đáng tin cậy&lt;/strong&gt; trên production khác gì so với &amp;ldquo;chạy được&amp;rdquo;? Chia làm hai phần: những gì cần làm ngay cả khi vẫn chạy single-node, và khi nào/làm sao chuyển sang cluster.&lt;/p&gt;
 &lt;h2 id="phần-1-vận-hành-single-node-đúng-cách"&gt;Phần 1: Vận hành single-node đúng cách&lt;/h2&gt;
-&lt;p&gt;Phần lớn hệ thống — kể cả ở quy mô một công ty vừa — &lt;strong&gt;không cần cluster&lt;/strong&gt;. VictoriaLogs single-node xử lý được khối lượng log rất lớn trên một máy đủ mạnh. Trước khi nghĩ đến cluster, đảm bảo bốn điều sau đã đúng.&lt;/p&gt;</description></item><item><title>About</title><link>https://quydmfl.github.io/about/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/about/</guid><description>&lt;h1 id="hi-"&gt;Hi 👋&lt;/h1&gt;
-&lt;p&gt;I&amp;rsquo;m Quy Duong Minh, a software engineer interested in building reliable systems.&lt;/p&gt;
-&lt;p&gt;I write about:&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Software Engineering&lt;/li&gt;
-&lt;li&gt;Backend&lt;/li&gt;
-&lt;li&gt;Distributed Systems&lt;/li&gt;
-&lt;li&gt;DevOps&lt;/li&gt;
-&lt;li&gt;AI&lt;/li&gt;
-&lt;li&gt;Databases&lt;/li&gt;
-&lt;li&gt;Linux&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>Archive</title><link>https://quydmfl.github.io/archives/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/archives/</guid><description/></item><item><title>Search</title><link>https://quydmfl.github.io/search/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/search/</guid><description/></item></channel></rss>
+&lt;p&gt;Phần lớn hệ thống — kể cả ở quy mô một công ty vừa — &lt;strong&gt;không cần cluster&lt;/strong&gt;. VictoriaLogs single-node xử lý được khối lượng log rất lớn trên một máy đủ mạnh. Trước khi nghĩ đến cluster, đảm bảo bốn điều sau đã đúng.&lt;/p&gt;</description></item><item><title>About</title><link>https://quydmfl.github.io/about/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/about/</guid><description/></item><item><title>Archive</title><link>https://quydmfl.github.io/archives/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/archives/</guid><description/></item><item><title>Search</title><link>https://quydmfl.github.io/search/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/search/</guid><description/></item></channel></rss>

@@ -1,0 +1,35 @@
+# Tập hợp các query LogsQL dùng trong bài viết, chạy trên chính log của
+# stack Vector + VictoriaLogs đã dựng ở bài 03-04.
+#
+# Cách chạy nhanh mỗi dòng qua HTTP API (bỏ phần comment khi copy):
+#   curl http://localhost:9428/select/logsql/query --data-urlencode 'query=<query>'
+
+# 1. Tìm mọi log chứa từ "error" (không phân biệt field, tìm trong _msg)
+error
+
+# 2. Tìm cụm từ chính xác
+"connection refused"
+
+# 3. Lọc theo field cụ thể: chỉ log của container victorialogs
+container_name:victorialogs
+
+# 4. Kết hợp field + từ khoá, giới hạn theo thời gian gần đây
+_time:15m container_name:vector error
+
+# 5. Lọc theo field đã enrich ở bài 04
+level:error environment:local
+
+# 6. Đếm số log entry theo container trong 1 giờ qua
+_time:1h | stats count() by (container_name)
+
+# 7. Đếm số log lỗi theo container, sắp giảm dần theo số lượng
+_time:1h level:error | stats count() as total by (container_name) | sort by (total) desc
+
+# 8. Chỉ lấy các field cần thiết để xem nhanh, thay vì cả JSON đầy đủ
+_time:15m | fields _time, container_name, level, _msg | sort by (_time) desc | limit 20
+
+# 9. Log của stderr trong 30 phút gần nhất
+_time:30m stream:stderr
+
+# 10. Tỉ lệ log error/warn theo từng container - nền tảng cho một dashboard cảnh báo
+_time:1h (level:error or level:warn) | stats count() as total by (container_name, level)

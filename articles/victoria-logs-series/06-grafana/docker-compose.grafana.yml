@@ -1,0 +1,27 @@
+# Override file: thêm Grafana vào stack đã có (victorialogs + vector) mà
+# không cần sửa docker-compose.yml gốc ở bài 03.
+#
+# Chạy bằng cách gộp cả hai file:
+#   docker compose -f ../03-installation/docker-compose.yml -f docker-compose.grafana.yml up -d
+
+services:
+  grafana:
+    image: docker.io/grafana/grafana-oss:11.4.0
+    container_name: grafana
+    environment:
+      # Cài sẵn plugin datasource VictoriaLogs khi container khởi động lần đầu,
+      # không cần thao tác thủ công qua grafana-cli.
+      - GF_INSTALL_PLUGINS=victoriametrics-logs-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      # Provisioning: Grafana tự đọc file này khi khởi động và tạo sẵn
+      # datasource, không cần cấu hình tay qua UI.
+      - ./config/datasource.yaml:/etc/grafana/provisioning/datasources/victorialogs.yaml:ro
+    depends_on:
+      - victorialogs
+    restart: unless-stopped
+
+volumes:
+  grafana-data:

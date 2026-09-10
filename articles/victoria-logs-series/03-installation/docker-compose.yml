@@ -1,0 +1,29 @@
+services:
+  victorialogs:
+    image: docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs
+    container_name: victorialogs
+    command:
+      - "-storageDataPath=/vlogs-data"
+      - "-retentionPeriod=30d"
+      - "-httpListenAddr=:9428"
+    ports:
+      - "9428:9428"
+    volumes:
+      - vlogs-data:/vlogs-data
+    restart: unless-stopped
+
+  vector:
+    image: docker.io/timberio/vector:latest-alpine
+    container_name: vector
+    volumes:
+      - ./config/vector.yaml:/etc/vector/vector.yaml:ro
+      # Vector cần đọc log của các container khác qua Docker socket.
+      # Mount read-only vì Vector chỉ cần "xem", không cần điều khiển Docker.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["--config", "/etc/vector/vector.yaml"]
+    depends_on:
+      - victorialogs
+    restart: unless-stopped
+
+volumes:
+  vlogs-data:

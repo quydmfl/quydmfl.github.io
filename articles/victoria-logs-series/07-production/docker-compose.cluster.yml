@@ -1,0 +1,65 @@
+# Stack tham khảo minh hoạ kiến trúc cluster của VictoriaLogs: tách vai trò
+# ghi (vlinsert), đọc (vlselect) và lưu trữ (vlstorage) thành các process
+# riêng biệt, dùng chung một binary victoria-logs với flag khác nhau.
+#
+# Đây là ví dụ tối thiểu để hiểu kiến trúc — production thật cần thêm
+# load balancer trước vlinsert/vlselect và chạy nhiều instance mỗi vai trò.
+
+services:
+  vlstorage-1:
+    image: docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs
+    container_name: vlstorage-1
+    command:
+      - "-httpListenAddr=:9428"
+      - "-storageDataPath=/vlogs-data"
+      - "-retentionPeriod=30d"
+    volumes:
+      - vlstorage-1-data:/vlogs-data
+    restart: unless-stopped
+
+  vlstorage-2:
+    image: docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs
+    container_name: vlstorage-2
+    command:
+      - "-httpListenAddr=:9428"
+      - "-storageDataPath=/vlogs-data"
+      - "-retentionPeriod=30d"
+    volumes:
+      - vlstorage-2-data:/vlogs-data
+    restart: unless-stopped
+
+  # vlinsert: nhận log từ Vector, chia đều dữ liệu sang các vlstorage.
+  # -select.disable: node này không phục vụ query, chỉ nhận ghi.
+  vlinsert:
+    image: docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs
+    container_name: vlinsert
+    command:
+      - "-httpListenAddr=:9428"
+      - "-storageNode=vlstorage-1:9428,vlstorage-2:9428"
+      - "-select.disable"
+    ports:
+      - "9481:9428"
+    depends_on:
+      - vlstorage-1
+      - vlstorage-2
+    restart: unless-stopped
+
+  # vlselect: nhận query từ Grafana/curl, chạy song song trên các vlstorage
+  # rồi gộp kết quả trả về. -insert.disable: node này không nhận ghi.
+  vlselect:
+    image: docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs
+    container_name: vlselect
+    command:
+      - "-httpListenAddr=:9428"
+      - "-storageNode=vlstorage-1:9428,vlstorage-2:9428"
+      - "-insert.disable"
+    ports:
+      - "9471:9428"
+    depends_on:
+      - vlstorage-1
+      - vlstorage-2
+    restart: unless-stopped
+
+volumes:
+  vlstorage-1-data:
+  vlstorage-2-data:

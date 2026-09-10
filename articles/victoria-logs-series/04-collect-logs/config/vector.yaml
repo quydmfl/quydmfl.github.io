@@ -1,0 +1,61 @@
+# Bản nâng cấp của config bài 03: thêm transform để parse, làm giàu và lọc
+# log trước khi ghi vào VictoriaLogs.
+
+sources:
+  docker_logs:
+    type: docker_logs
+
+transforms:
+  # Bước 1: chuẩn hoá + làm giàu mọi log entry, bất kể nguồn gốc.
+  enrich:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      # docker_logs source trả field "message" là string thô.
+      # Nếu message là JSON hợp lệ (log có cấu trúc từ ứng dụng),
+      # merge các field bên trong nó vào event -> query được theo từng field
+      # thay vì chỉ tìm được bằng full-text trên _msg.
+      parsed, err = parse_json(.message)
+      if err == null && is_object(parsed) {
+        . = merge(., object!(parsed))
+      }
+
+      # Gắn thêm field môi trường cố định, hữu ích khi sau này đẩy log từ
+      # nhiều môi trường (staging/prod) vào cùng một VictoriaLogs.
+      .environment = "local"
+
+      # Chuẩn hoá level log về chữ thường để filter trong LogsQL nhất quán,
+      # bất kể ứng dụng log "ERROR", "error" hay "Error".
+      if exists(.level) {
+        .level = downcase(to_string!(.level))
+      }
+
+  # Bước 2: loại bỏ log rặt tiếng ồn, không mang giá trị điều tra sự cố.
+  # Ví dụ: log healthcheck lặp lại liên tục từ chính Vector/VictoriaLogs.
+  drop_noise:
+    type: filter
+    inputs:
+      - enrich
+    condition: |
+      !contains!(string!(.message), "GET /health")
+
+sinks:
+  victorialogs:
+    type: elasticsearch
+    inputs:
+      - drop_noise
+    endpoints:
+      - "http://victorialogs:9428/insert/elasticsearch/"
+    mode: bulk
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    query:
+      _msg_field: message
+      _time_field: timestamp
+      # Thêm "environment" vào stream field: số giá trị của "environment"
+      # rất nhỏ và ổn định (local/staging/prod) nên an toàn để làm stream key,
+      # không gây bùng nổ cardinality như đã cảnh báo ở bài 02.
+      _stream_fields: container_name,host,environment

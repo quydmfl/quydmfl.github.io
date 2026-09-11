@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-internals-03
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: vacuum_demo
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - pg-internals-03-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pg-internals-03-data:

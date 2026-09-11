@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-ops-01
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: appdb
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "archive_mode=on"
+      - "-c"
+      - "archive_command=mkdir -p /var/lib/postgresql/wal_archive && cp %p /var/lib/postgresql/wal_archive/%f"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - pg-ops-01-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pg-ops-01-data:

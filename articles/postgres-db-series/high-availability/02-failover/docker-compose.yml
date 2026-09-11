@@ -1,0 +1,50 @@
+services:
+  primary:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-ha-02-primary
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: appdb
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "max_wal_senders=5"
+      - "-c"
+      - "max_replication_slots=5"
+      - "-c"
+      - "wal_log_hints=on"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - pg-ha-02-primary-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  replica:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-ha-02-replica
+    environment:
+      PGUSER: replicator
+      PGPASSWORD: replicator
+    ports:
+      - "5433:5432"
+    depends_on:
+      - primary
+    volumes:
+      - pg-ha-02-replica-data:/var/lib/postgresql/data
+    entrypoint: >
+      sh -c "
+      until pg_isready -h primary -U demo; do sleep 1; done;
+      rm -rf /var/lib/postgresql/data/*;
+      gosu postgres pg_basebackup -h primary -D /var/lib/postgresql/data -U replicator -Fp -Xs -R -v -P;
+      chmod 0700 /var/lib/postgresql/data;
+      exec gosu postgres postgres
+      "
+    restart: unless-stopped
+
+volumes:
+  pg-ha-02-primary-data:
+  pg-ha-02-replica-data:

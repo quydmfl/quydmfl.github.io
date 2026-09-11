@@ -1,0 +1,32 @@
+services:
+  node_a:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-ha-05-node-a
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: shard_a
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/node_a:/docker-entrypoint-initdb.d:ro
+      - pg-ha-05-node-a-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  node_b:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-ha-05-node-b
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: shard_b
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./sql/node_b:/docker-entrypoint-initdb.d:ro
+      - pg-ha-05-node-b-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pg-ha-05-node-a-data:
+  pg-ha-05-node-b-data:

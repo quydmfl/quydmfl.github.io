@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-ops-03
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: appdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - pg-ops-03-data:/var/lib/postgresql/data
+      - pg-ops-03-data17:/var/lib/postgresql/data17
+    restart: unless-stopped
+
+volumes:
+  pg-ops-03-data:
+  pg-ops-03-data17:

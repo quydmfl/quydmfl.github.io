@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: docker.io/postgres:16-alpine
+    container_name: pg-perf-03
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: perf_demo
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - pg-perf-03-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pg-perf-03-data:

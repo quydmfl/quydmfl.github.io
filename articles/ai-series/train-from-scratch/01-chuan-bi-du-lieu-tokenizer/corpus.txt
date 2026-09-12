@@ -1,0 +1,279 @@
+Mở đầu sub-series Nền tảng (AI Fundamentals): trước khi chạm vào bất kỳ neural network, transformer hay LLM nào, cần nắm chắc 2 khái niệm nền tảng của PyTorch — tensor và autograd. Mọi model, từ mạng 2 lớp đơn giản đến transformer hàng tỷ tham số, đều chỉ là các phép toán trên tensor, và việc train model đều dựa vào đúng 1 cơ chế: autograd tự động tính gradient để chạy gradient descent. Bài này đi vào cơ chế đó bằng ví dụ nhỏ nhất có thể — hồi quy tuyến tính — nhưng tự tay verify autograd tính đúng, không tin mù quáng.
+
+Tensor là gì, khác gì array/numpy
+
+Tensor trong PyTorch, xét thuần về dữ liệu, giống numpy.ndarray: một mảng nhiều chiều có shape (số chiều và kích thước mỗi chiều) và dtype (kiểu dữ liệu, ví dụ float32). Tensor còn có thêm device — tensor có thể nằm trên CPU hoặc GPU (cuda), và phép toán giữa 2 tensor chỉ thực hiện được khi cùng device.
+
+Điểm khác biệt cốt lõi, thứ khiến tensor không chỉ là "numpy có thêm GPU", là autograd: tensor PyTorch có thể mang cờ requires_grad=True, nghĩa là PyTorch sẽ theo dõi mọi phép toán thực hiện trên tensor đó để sau này tự tính được đạo hàm (gradient) ngược lại. numpy không có khái niệm này — tính gradient bằng tay là việc của người viết code.
+
+requires_grad=True chỉ cần đặt trên các tensor là tham số cần học (như w, b ở phần demo dưới) — dữ liệu đầu vào (x, y_true) không cần, vì không có gì để học từ chính dữ liệu.
+
+Autograd hoạt động thế nào (computational graph)
+
+Mỗi phép toán thực hiện trên một tensor có requires_grad=True không chỉ ra kết quả — nó còn được PyTorch ghi lại thành một node trong một computational graph (đồ thị tính toán), cụ thể là một DAG (Directed Acyclic Graph — đồ thị có hướng không chu trình). Node lá là các tensor tham số ban đầu (w, b); mỗi node tiếp theo là kết quả của một phép toán, và biết được nó được tính ra từ node nào, bằng phép toán nào.
+
+Khi gọi .backward() trên tensor kết quả cuối (thường là loss, một số vô hướng), PyTorch đi ngược graph này từ node cuối về từng node lá, áp dụng chain rule (quy tắc đạo hàm hàm hợp) tại mỗi bước. Kết quả: mỗi tensor lá có requires_grad=True sẽ có thuộc tính .grad chứa đúng đạo hàm của loss theo tensor đó — mà người viết code không cần tự viết công thức đạo hàm cho bất kỳ phép toán nào.
+
+Đây chính là lý do autograd giá trị: với một model vài chục triệu tham số, việc tự tay viết công thức đạo hàm cho từng phép toán là bất khả thi — autograd làm việc đó tự động, chính xác, cho graph bất kỳ độ phức tạp nào.
+
+Demo: hồi quy tuyến tính bằng gradient descent
+
+Ví dụ nhỏ nhất để thấy autograd chạy thật: học 2 tham số w, b của một đường thẳng y = w*x + b sao cho khớp với dữ liệu thật y = 3x + 2 (có thêm chút nhiễu ngẫu nhiên nhỏ để giống dữ liệu thật hơn là một đường thẳng hoàn hảo).
+
+Chạy bằng đúng venv đã cài torch:
+
+loss giảm từ 7.495026 xuống 0.001852 chỉ sau 40 step đầu rồi đứng yên — w hội tụ về 3.0483, b về 2.0174, rất gần với 3 và 2 thật của dữ liệu (phần lệch còn lại chính là do nhiễu ngẫu nhiên đã cộng vào y_true).
+
+Từng dòng trong loop:
+
+- loss.backward() — chạy chain rule ngược qua computational graph vừa dựng khi tính y_pred và loss, ghi kết quả vào w.grad và b.grad.
+- with torch.no_grad(): — bọc quanh bước update tham số. Nếu không có block này, phép trừ w -= lr * w.grad cũng sẽ bị autograd ghi vào graph như một phép toán mới, làm graph phình to vô nghĩa qua từng step (vì bước update không cần tính đạo hàm ngược lại). torch.no_grad() tắt việc theo dõi graph tạm thời cho đúng đoạn code cần.
+- .zero_() — gradient trong PyTorch cộng dồn (accumulate) vào .grad mỗi lần gọi .backward(), không tự reset. Không gọi w.grad.zero_() và b.grad.zero_() sau mỗi step, gradient của step sau sẽ cộng thêm vào gradient step trước, phá vỡ toàn bộ gradient descent.
+
+Verify: tự tính gradient tay, đối chiếu autograd
+
+Để chắc autograd không phải một hộp đen tính ra số gì cũng tin, phần còn lại của script tự tay đạo hàm công thức MSE loss của model tuyến tính, rồi so với số autograd tính ra tại đúng điểm w, b vừa hội tụ.
+
+Với L = mean((x*w + b - y)^2), đạo hàm riêng theo w và b:
+
+Gradient tay và gradient autograd khớp nhau tới sai số dưới 1e-5 (cả 2 đều gần 0 — đúng như kỳ vọng, vì tại điểm hội tụ gradient phải tiến về 0). w2, b2 được tách ra bằng .detach().clone().requires_grad_(True) — một bản copy độc lập của w, b hiện tại, không liên quan đến graph cũ — để .backward() lần 2 tính gradient sạch, không bị ảnh hưởng bởi bất cứ thứ gì còn sót lại từ loop trước. Kết quả này khẳng định autograd không phải "hộp đen" — nó tính đúng công thức đạo hàm chuẩn, chỉ tự động hoá phần code mà lẽ ra phải viết tay.
+
+Tổng kết & bài tiếp theo
+
+Autograd = tự động hoá chain rule trên một computational graph được PyTorch ghi lại từ mọi phép toán trên tensor requires_grad=True. .backward() chạy graph này ngược lại một lần, đổ kết quả vào .grad của từng tensor lá — đúng, đã verify bằng công thức đạo hàm tay ở trên, không phải chỉ tin theo tài liệu.
+
+Bài 02 sẽ viết forward và backward hoàn toàn bằng tay cho một neural network — không dùng autograd — để thấy rõ, ở quy mô lớn hơn một chút, autograd đang thay chúng ta làm chính xác việc gì.
+
+Bài 01 dùng autograd của PyTorch để tự động tính gradient cho một bài toán hồi quy tuyến tính — gọi loss.backward() và mọi đạo hàm cần thiết xuất hiện trong .grad. Bài này làm ngược lại: viết forward pass và backward pass hoàn toàn bằng tay, chỉ dùng NumPy thuần, không torch, không autograd. Mục đích không phải để chứng minh autograd sai (bài 01 đã verify nó đúng) — mà để thấy rõ, ở quy mô một neural network thật (có hidden layer, có activation phi tuyến), autograd đang tự động hoá chính xác việc gì.
+
+Vì sao chọn XOR
+
+Bài 01 học hàm y = 3x + 2 — một đường thẳng, tuyến tính. Một model tuyến tính đơn (w*x + b, không hidden layer) học được nó dễ dàng vì bản chất bài toán cũng tuyến tính.
+
+XOR (phép toán logic XOR) không có tính chất đó. Bảng chân trị:
+
+Vẽ 4 điểm này lên mặt phẳng 2 chiều: (0,0) và (1,1) thuộc lớp 0, (0,1) và (1,0) thuộc lớp 1. Không có đường thẳng nào tách được 2 lớp này — XOR không linearly separable. Đây là ví dụ kinh điển trong lịch sử neural network (Minsky & Papert, 1969) chỉ ra giới hạn của perceptron 1 lớp, và chính là lý do cần ít nhất 1 hidden layer với activation phi tuyến để giải nó. Đó là lý do XOR phù hợp làm demo cho bài này: đủ nhỏ để viết tay toàn bộ gradient, nhưng đủ để bắt buộc phải có kiến trúc nhiều lớp — thứ bài 01 không cần.
+
+Forward pass: kiến trúc 2-4-1
+
+Kiến trúc dùng: input 2 chiều (2 bit của XOR) → hidden layer 4 neuron → output 1 chiều (dự đoán XOR), cả 2 layer dùng activation sigmoid.
+
+W1 có shape (2, 4) — 2 input feature nhân vào 4 hidden neuron; W2 có shape (4, 1) — 4 hidden activation nhân vào 1 output. Trọng số khởi tạo ngẫu nhiên (rng.normal, seed cố định 0 để kết quả tái lập được), bias khởi tạo 0.
+
+Forward pass, chạy đồng thời cho cả 4 sample XOR (batch, không phải loop từng sample):
+
+X có shape (4, 2) — 4 sample, mỗi sample 2 feature. X @ W1 là phép nhân ma trận (4,2) @ (2,4) = (4,4): mỗi hàng kết quả là tổ hợp tuyến tính của 2 input theo trọng số của từng hidden neuron. Cộng b1 (broadcast theo hàng) ra z1, activation sigmoid ra a1 — đây là hidden activation phi tuyến, chính là thứ giúp model tách được XOR. a1 @ W2 lặp lại đúng logic đó để đi từ hidden layer ra output: (4,4) @ (4,1) = (4,1), cộng b2, qua sigmoid ra a2 — dự đoán cuối cùng, một số trong (0, 1).
+
+Backward pass: chain rule viết tay từng layer
+
+Đây là phần bài 01 để autograd làm tự động. Ở đây viết tay toàn bộ, layer nào tính riêng gradient của layer đó, đi ngược từ output về input — đúng nghĩa backpropagation.
+
+Đi từng dòng, theo đúng chiều chain rule (từ loss ngược về input):
+
+- d_a2 = 2 * (a2 - Y) / Y.shape[0] — đạo hàm của MSE loss mean((a2-Y)^2) theo a2. Đây là điểm bắt đầu của chain rule: gradient của loss theo output của toàn network.
+- d_z2 = d_a2 * a2 * (1 - a2) — nhân tiếp với đạo hàm của sigmoid (sigmoid'(z) = sigmoid(z) * (1 - sigmoid(z)), và a2 = sigmoid(z2) nên viết trực tiếp bằng a2). Đây là bước chain rule qua activation: dL/dz2 = dL/da2 * da2/dz2.
+- d_W2 = a1.T @ d_z2 và d_b2 = d_z2.sum(axis=0, keepdims=True) — gradient của loss theo tham số W2, b2 của layer output, tính trực tiếp từ d_z2 (vì z2 = a1 @ W2 + b2 là tuyến tính theo W2, b2).
+- d_a1 = d_z2 @ W2.T — đây là bước lan gradient ngược qua layer: gradient của loss theo a1 (output của hidden layer) bằng gradient theo z2 nhân với W2.T — chính công thức đạo hàm hàm hợp cho phép nhân ma trận a1 @ W2. W2.T có shape (1, 4), d_z2 shape (4, 1), kết quả d_a1 shape (4, 4) — đúng shape của a1.
+- d_z1 = d_a1 * a1 * (1 - a1) — lại nhân với đạo hàm sigmoid, lần này của layer hidden, giống bước tính d_z2 ở trên nhưng cho layer trước.
+- d_W1 = X.T @ d_z1, d_b1 = d_z1.sum(axis=0, keepdims=True) — gradient theo tham số của layer input, tính hoàn toàn tương tự d_W2, d_b2.
+
+Chuỗi d_a2 → d_z2 → d_a1 → d_z1 chính là chain rule lan ngược qua 2 layer — mỗi layer có đúng 2 bước: nhân với đạo hàm activation, rồi nhân với trọng số để lan tiếp về layer trước. Đây đúng là những gì loss.backward() ở bài 01 làm tự động cho toàn bộ computational graph, chỉ khác là ở đây phải tự viết công thức đạo hàm cho từng phép toán (sigmoid', đạo hàm phép nhân ma trận) và tự nối chúng lại theo đúng thứ tự ngược.
+
+Kết quả
+
+Chạy script bằng đúng venv đã cài numpy:
+
+Loss giảm từ 0.343003 xuống 0.002183 qua 5000 epoch — phần lớn giảm diễn ra khá muộn: từ epoch 1000 (0.218805) đến epoch 2000 (0.023303) loss rơi mạnh, cho thấy network cần một khoảng "khởi động" trước khi tìm ra được cách tách XOR bằng hidden layer. Kết quả cuối: cả 4 dự đoán đều đúng sau khi round — 0.0196 → 0, 0.9516 → 1, 0.9524 → 1, 0.0611 → 0 — khớp 100% với target XOR thật. Hai assertion cuối script (preds_rounded == Y và loss giảm ít nhất 95%) đều pass, không chỉ là số nhìn có vẻ ổn.
+
+Tổng kết & bài tiếp theo
+
+Backpropagation không có gì huyền bí hơn: nó là chain rule áp dụng lặp lại qua nhiều layer, đi từ loss ở output ngược về input, mỗi layer đóng góp đúng 2 bước — nhân với đạo hàm activation, rồi nhân với trọng số để lan gradient sang layer trước. Autograd ở bài 01 tự động hoá chính xác chuỗi phép toán này cho graph bất kỳ độ sâu nào; viết tay ở bài này cho thấy rõ từng bước đó là gì.
+
+Bài 03 sẽ nói về kiến trúc transformer — một mạng có backprop chạy theo đúng nguyên lý chain rule y hệt ở đây, nhưng thay hidden layer dày đặc (fully-connected) bằng attention, cơ chế cho phép model học quan hệ giữa các vị trí trong sequence.
+
+Bài 02 viết tay chain rule qua 2 layer fully-connected — backprop lan gradient ngược từ loss về input, mỗi layer đúng 2 bước. Cơ chế đó không đổi ở bất kỳ kiến trúc nào phía sau, kể cả kiến trúc đang thống trị NLP và LLM hiện nay: transformer. Điều thay đổi là cách một layer xử lý dữ liệu dạng sequence (câu văn, token) — và đó là chủ đề bài này.
+
+RNN/LSTM xử lý sequence thế nào, và giới hạn của nó
+
+RNN (Recurrent Neural Network) xử lý một sequence bằng cách duy trì một hidden state, cập nhật nó từng timestep một:
+
+Để tính hidden_t, buộc phải có hidden_{t-1} trước — không có cách nào bỏ qua bước này. Với sequence dài seq_len timestep, RNN phải chạy đúng seq_len bước tuần tự, bước sau chờ bước trước xong mới bắt đầu. LSTM/GRU thêm cổng (gate) để kiểm soát thông tin giữ lại/bỏ qua qua thời gian, nhưng không phá được ràng buộc tuần tự này — hidden state vẫn phải đi qua từng timestep một.
+
+Đây là giới hạn cốt lõi khi sequence dài: GPU mạnh ở chỗ xử lý song song hàng nghìn phép tính cùng lúc, nhưng vòng lặp tuần tự theo timestep của RNN không cho phép điều đó — bước t+1 không thể bắt đầu trước khi bước t xong, dù có bao nhiêu GPU core rảnh.
+
+Attention: bỏ hoàn toàn tính tuần tự
+
+Self-attention giải quyết đúng vấn đề đó bằng cách bỏ khái niệm "hidden state truyền qua thời gian". Mỗi vị trí trong sequence "nhìn" tất cả vị trí khác — kể cả chính nó — cùng một lúc, thông qua 3 phép chiếu tuyến tính (Q, K, V) và một phép nhân ma trận:
+
+q @ k.T tính "độ liên quan" giữa mọi cặp vị trí trong sequence cùng một lượt — kết quả là ma trận (seq_len, seq_len), không có vòng lặp Python nào theo timestep. softmax chuẩn hoá độ liên quan đó thành trọng số, weights @ v gộp thông tin từ mọi vị trí theo trọng số đó. Toàn bộ là phép đại số tuyến tính trên ma trận — thứ GPU tối ưu để chạy song song.
+
+Không có bước nào trong công thức này bắt vị trí t phải đợi vị trí t-1 xử lý xong. Đó là khác biệt kiến trúc căn bản so với RNN: attention song song hoá được trên GPU, RNN thì không — benchmark dưới đây đo khác biệt đó bằng số thật.
+
+Benchmark thật: RNN loop vs attention matmul
+
+Để thấy khác biệt này rõ bằng số, không chỉ bằng lý thuyết: viết 2 hàm forward — một RNN loop tuần tự (mỗi bước gọi lại torch.tanh trên hidden state cũ), một attention matmul (không vòng lặp theo timestep) — rồi đo thời gian chạy thật ở các độ dài sequence tăng dần.
+
+rnn_forward là vòng lặp for t in range(seq_len) viết bằng Python thuần — mỗi bước đúng 1 phép nhân ma trận nhỏ (d,) @ (d, d), nhưng phải chạy seq_len lần liên tiếp vì hidden của bước sau phụ thuộc bước trước. attention_forward không có for theo timestep nào — dù seq_len tăng lên, nó vẫn chỉ là vài phép nhân ma trận lớn, thứ PyTorch/GPU xử lý song song trong nội bộ 1 lệnh.
+
+Chạy script bằng đúng venv đã cài torch:
+
+Kết quả đo trên máy chạy bài viết này — số ms cụ thể có thể khác giữa các lần chạy do đây là benchmark timing thật (time.perf_counter()), phụ thuộc máy và tải hệ thống lúc đo, nhưng thứ tự RNN chậm hơn attention ở seq dài luôn giữ nguyên:
+
+Ở seq_len=32 hoặc 128, chênh lệch chưa rõ ràng — overhead khởi tạo, warm-up của Python/PyTorch còn lớn hơn cả phần việc thật. Nhưng nhìn theo cột RNN loop: thời gian tăng gần tuyến tính theo seq_len (nhiều hơn 128 timestep là chạy nhiều hơn 128 lần vòng lặp Python, mỗi lần có overhead riêng của interpreter) — từ seq_len=512 lên 2048 (tăng 4 lần), RNN loop tăng đúng khoảng 4 lần (2.48ms → 10.02ms). Cột Attention matmul ở mọi dòng vẫn nhanh hơn RNN loop về số tuyệt đối, nhưng tăng KHÔNG chậm hơn RNN loop theo seq_len — ngược lại: cùng khoảng 512 → 2048 đó, attention tăng khoảng 10 lần (0.54ms → 5.53ms), nhanh hơn tuyến tính rõ rệt. Đây không phải nhiễu đo: nó phản ánh đúng chi phí của attention — mỗi token phải nhìn tất cả token khác trong sequence, nên tổng khối lượng tính toán là O(n² · d) theo độ dài sequence n, không phải O(n) như RNN. Ở seq_len=2048, khoảng cách tuyệt đối vẫn đủ lớn để thấy rõ: RNN loop mất khoảng gấp đôi thời gian so với attention matmul. Script đo lại seq_len=2048 một lần riêng biệt nữa để chạy assertion cuối (t_rnn_big > t_attn_big) — đó là lý do dòng OK: in ra số ms khác với dòng 2048 trong bảng ở trên (10.2ms/3.7ms so với 10.02ms/5.53ms): không phải sai lệch hay lỗi đo, mà là 2 lần gọi time.perf_counter() khác nhau trên cùng kích thước input, và biến thiên nhỏ giữa các lần đo là bình thường với benchmark timing thật (phụ thuộc tải hệ thống lúc đo). Assertion đó pass — không phải nhìn số rồi suy diễn, mà là điều kiện được code verify trực tiếp.
+
+Điều quan trọng cần tách rõ: attention thắng RNN ở benchmark trên không phải vì nó "rẻ hơn" về mặt tính toán khi sequence dài ra. Về tiệm cận, attention còn tệ hơn — tổng compute là O(n²) theo n = seq_len (mọi token nhìn mọi token), trong khi RNN là O(n). Attention thắng ở quy mô benchmark này vì nó song song hoá được: không có phụ thuộc tuần tự giữa các vị trí, nên GPU/BLAS chạy cả sequence trong 1 phép matmul, còn RNN phải trả giá overhead của hàng nghìn lệnh Python tuần tự — cái giá đó lớn hơn hẳn phần compute thật ở quy mô vài nghìn token. Ở sequence rất dài hơn nữa (hàng chục nghìn đến hàng trăm nghìn token, như context window của LLM hiện đại), chi phí O(n²) đó lại trở thành nút thắt thật của chính attention — đây chính là lý do các kỹ thuật như KV-cache và flash-attention tồn tại (ngoài phạm vi bài này, sẽ gặp lại ở sub-series sau).
+
+Đây chính là lý do thực dụng, không chỉ lý thuyết, khiến ngành chuyển từ RNN/LSTM sang transformer ở quy mô hiện tại: cùng một phần cứng GPU, attention khai thác được tính song song mà RNN cấu trúc tuần tự không cho phép — không phải vì attention có chi phí tính toán tăng chậm hơn khi sequence dài ra.
+
+Kiến trúc tổng thể encoder/decoder
+
+Transformer gốc (Vaswani et al., 2017, "Attention Is All You Need") có 2 phần: encoder và decoder, mỗi phần là chồng nhiều layer attention + fully-connected. 3 cách dùng phổ biến:
+
+- Encoder-only (BERT-style): mỗi vị trí nhìn được cả 2 chiều — token trước và sau nó trong sequence. Phù hợp cho bài toán hiểu ngữ nghĩa (classification, embedding), không sinh text.
+- Decoder-only (GPT-style): mỗi vị trí chỉ nhìn được các token trước nó — dùng causal mask để chặn attention "nhìn về tương lai" (mask giá trị -inf vào các vị trí sau, trước khi softmax). Đây là kiến trúc để sinh text — dự đoán token tiếp theo dựa vào những gì đã có.
+- Encoder-decoder (T5-style, dịch máy): encoder đọc toàn bộ input 2 chiều, decoder sinh output từng token, có thêm attention "nhìn" vào output của encoder (cross-attention).
+
+Hầu hết LLM hiện đại — GPT, Llama, Qwen — là decoder-only. Lý do thực dụng: bài toán chính của LLM là sinh text nối tiếp (next-token prediction), decoder-only đủ để làm việc đó, kiến trúc đơn giản hơn encoder-decoder, và scale tốt lên số lượng tham số/dữ liệu khổng lồ. Causal mask chính là điểm khác biệt kiến trúc giữa GPT và BERT — cùng dùng self-attention, nhưng BERT cho nhìn cả 2 chiều, GPT chỉ cho nhìn về trước.
+
+Tổng kết & bài tiếp theo
+
+RNN xử lý sequence tuần tự vì hidden state của mỗi timestep phụ thuộc timestep trước — không tận dụng được tính song song của GPU khi sequence dài. Attention bỏ hoàn toàn ràng buộc đó: mọi vị trí nhìn mọi vị trí khác qua đúng 1 phép nhân ma trận Q @ K.T, benchmark ở trên đo trực tiếp hệ quả đó bằng số thật. Đây là lý do kiến trúc transformer thay thế RNN/LSTM trong hầu hết bài toán NLP quy mô lớn hiện nay.
+
+Bài này mới nói attention ở mức "1 phép matmul duy nhất" — chưa đi vào chi tiết Q/K/V được tính thế nào, vì sao chia sqrt(d), hay multi-head nghĩa là gì. Bài 04 sẽ cài multi-head attention từ đầu, verify khớp torch.nn.MultiheadAttention.
+
+Bài 03 chứng minh bằng benchmark thật: attention xử lý cả sequence trong 1 phép matmul Q @ K.T, không có vòng lặp tuần tự theo timestep như RNN. Bài đó dừng ở mức "1 phép matmul duy nhất" — chưa nói Q/K/V được tính ra sao, vì sao chia sqrt(d_k), hay multi-head nghĩa là gì (bài 03 viết d  0.5/chia sqrt(d), vì bài đó chỉ có 1 head nên d và d_k là cùng một giá trị — ký hiệu d_k chỉ cần phân biệt rõ khi tách ra nhiều head như bài này). Bài này cài từng phần đó từ đầu, rồi verify bằng cách đối chiếu trực tiếp với torch.nn.MultiheadAttention — không phải "nhìn có vẻ đúng", mà là sai số đo được giữa 2 cách tính.
+
+Q, K, V là gì
+
+Mỗi token trong sequence không đi thẳng vào attention — nó được chiếu qua 3 ma trận trọng số học được (Wq, Wk, Wv) thành 3 vector riêng: Query, Key, Value.
+
+Trực giác thường dùng: Query là câu "hỏi" của token hiện tại — nó đang tìm thông tin gì ở các token khác. Key là câu "trả lời có khớp không" của mỗi token — mức độ nó liên quan đến câu hỏi đó. Value là nội dung thật token đó mang theo, sẽ được lấy ra nếu Key khớp Query.
+
+Q @ K.T tính độ khớp giữa mọi cặp Query/Key trong sequence — kết quả là ma trận điểm số (seq_len, seq_len). Value không tham gia vào bước tính điểm số này; nó chỉ được gộp vào sau, theo trọng số suy ra từ điểm số Q/K.
+
+Scaled dot-product attention
+
+Công thức đầy đủ:
+
+Q @ K.T là tích vô hướng (dot-product) giữa mọi cặp Query/Key — giá trị này tăng theo số chiều d_k của vector (tổng của d_k số hạng, mỗi số hạng có phương sai cỡ 1, nên tổng có phương sai cỡ d_k). Nếu không chia, điểm số ở d_k lớn sẽ rất lớn hoặc rất nhỏ, đẩy softmax vào vùng bão hoà — gradient gần như bằng 0 ở hầu hết vị trí, model học chậm hoặc không học được. Chia sqrt(d_k) đưa phương sai của điểm số về lại cỡ 1, giữ softmax ở vùng có gradient hữu ích.
+
+mask (không dùng trong demo này) là chỗ cắm causal mask nói ở bài trước — masked_fill gán -inf vào các vị trí bị cấm nhìn, để sau softmax trọng số của chúng thành đúng 0.
+
+Multi-head: nhiều "góc nhìn" song song
+
+Dùng đúng 1 bộ Q/K/V trên toàn bộ embed_dim chỉ cho model 1 cách nhìn quan hệ giữa token. Multi-head chia embed_dim thành num_heads phần nhỏ bằng nhau (head_dim = embed_dim // num_heads), chạy scaled dot-product attention độc lập** trên từng phần, rồi ghép kết quả lại và chiếu qua 1 ma trận trọng số ra (out_proj). Mỗi head có không gian con riêng để học 1 kiểu quan hệ khác nhau — head này có thể học quan hệ cú pháp gần, head khác học quan hệ ngữ nghĩa xa — và toàn bộ vẫn chỉ là phép nhân ma trận, không thêm vòng lặp tuần tự nào.
+
+in_proj_weight là 1 ma trận duy nhất gộp cả Wq, Wk, Wv (đúng cách torch.nn.MultiheadAttention lưu trọng số) — x @ in_proj_weight.T ra thẳng 3*embed_dim chiều, chunk(3, dim=-1) tách lại thành Q/K/V. split_heads tách tiếp embed_dim thành (num_heads, head_dim) và đưa chiều head lên trước chiều sequence, để scaled_dot_product_attention chạy song song trên cả num_heads head cùng lúc bằng broadcasting — không có vòng lặp Python theo head.
+
+Positional encoding
+
+Attention nhìn tất cả vị trí cùng lúc, không có khái niệm "trước/sau" tự nhiên như RNN — hoán đổi thứ tự 2 token trong input, Q @ K.T cho đúng cùng một tập điểm số (chỉ đổi chỗ), attention không tự phân biệt được. Vì vậy cần cộng thêm thông tin vị trí vào embedding trước khi vào attention: positional encoding.
+
+Cách dùng trong bài này là sinusoidal — cố định, không học — lấy đúng công thức từ paper "Attention Is All You Need":
+
+Mỗi vị trí pos có 1 vector dim chiều riêng, tần số sin/cos khác nhau theo từng chiều — 2 vị trí khác nhau luôn ra vector khác nhau, và khoảng cách giữa 2 vector này mang thông tin khoảng cách giữa 2 vị trí. Cộng trực tiếp vào embedding token (x = x + pe) trước khi đưa vào attention, model có đủ thông tin cả nội dung (embedding) và vị trí (positional encoding) để tính Q/K/V.
+
+Verify: đối chiếu với torch.nn.MultiheadAttention
+
+Ghép cả 3 phần trên — Q/K/V, scaled dot-product, multi-head — cộng thêm positional encoding vào input, rồi so kết quả với layer có sẵn của PyTorch, dùng lại đúng weight (ref_attn.in_proj_weight, ref_attn.out_proj.weight) để đảm bảo 2 bên tính trên cùng tham số:
+
+Sai số 1.192e-07 ở output và 2.980e-08 ở attention weights — cỡ machine epsilon của float32, tức sai khác chỉ do thứ tự phép tính dấu phẩy động, không phải do công thức sai. Đây là bằng chứng cài đúng scaled dot-product attention và cách gộp/tách multi-head đúng như PyTorch triển khai, không phải "nhìn kết quả có vẻ hợp lý".
+
+Tổng kết & bài tiếp theo
+
+Bài này cài đủ 3 phần cốt lõi của self-attention: Q/K/V (chiếu token thành 3 vector qua trọng số học được), scaled dot-product (softmax(QK^T / sqrt(d_k))V, chia sqrt(d_k) để tránh bão hoà softmax), và multi-head (chia nhỏ embed_dim, học nhiều kiểu quan hệ song song) — cộng thêm positional encoding để attention biết thứ tự token. Verify bằng số thật, không suy diễn: sai số so với torch.nn.MultiheadAttention ở cỡ 1e-7.
+
+Có đủ Q/K/V, multi-head, và positional encoding để lắp thành 1 layer attention hoàn chỉnh trong model GPT thật ở các bài sau. Nhưng trước khi vào attention, text phải được biến thành số — đó là chủ đề Bài 05: tokenization và embeddings.
+
+Bài 04 cài multi-head attention từ đầu và verify sai số với torch.nn.MultiheadAttention, nhưng input của attention luôn được giả định sẵn là số — tensor (batch, seq, embed_dim). Model không đọc được chữ. Trước khi bất cứ token nào đi vào Q @ K.T, phải có một bước biến câu chữ thành số nguyên, rồi biến số nguyên đó thành vector. Bước đầu gọi là tokenization, bước sau gọi là embedding. Bài này cài cả hai từ đầu, không dùng thư viện tokenizers hay transformers.
+
+Corpus dùng xuyên suốt bài — để train BPE và minh hoạ mọi ví dụ phía dưới — là 4 câu tiếng Việt cố định sau:
+
+Vì sao không tokenize theo từ hoặc theo ký tự
+
+Cách đơn giản nhất là tokenize theo từ: mỗi từ trong corpus là 1 token. Vấn đề là vocab phình rất nhanh — tiếng Việt có biến thể, ghép từ, và bất kỳ từ nào không có trong vocab lúc train (out-of-vocabulary — OOV) đều không encode được, phải thay bằng token <unk> và mất hết thông tin của từ đó.
+
+Cách khác là tokenize theo ký tự: vocab nhỏ, không có OOV vì mọi từ đều ghép từ ký tự có sẵn. Nhưng sequence dài ra rất nhiều — mỗi từ vài ký tự thành vài token — và mỗi token 1 ký tự không mang ngữ nghĩa gì, model phải tự học lại từ đầu cấu trúc âm tiết/từ chỉ từ ký tự rời.
+
+BPE (Byte Pair Encoding) là điểm cân bằng giữa hai cực đó: bắt đầu từ ký tự (vocab nhỏ, không OOV ở cấp ký tự), rồi lặp lại việc gộp cặp ký tự/token xuất hiện thường xuyên nhất thành 1 token mới. Kết quả là vocab chứa cả ký tự đơn lẫn các đơn vị con-từ (subword) hay gặp — token dài hơn cho từ phổ biến, token ngắn (rời về ký tự) cho từ hiếm hoặc chưa từng thấy.
+
+Thuật toán BPE: đếm cặp, gộp cặp phổ biến nhất, lặp lại
+
+Mỗi từ được tách thành list ký tự, cộng thêm 1 token _ đánh dấu ranh giới cuối từ — cần thiết để decode biết chỗ nào chèn khoảng trắng lại:
+
+Train BPE là một vòng lặp đơn giản: đếm tần suất mọi cặp symbol liền kề trong toàn corpus, tìm cặp xuất hiện nhiều nhất, gộp nó thành 1 token mới ở khắp mọi nơi, rồi lặp lại trên corpus đã gộp:
+
+get_word_freqs chạy trước tiên trong train_bpe: tách mỗi câu trong corpus thành từ (line.split()), mỗi từ thành list symbol qua word_to_symbols, rồi đếm số lần mỗi từ (dạng tuple symbol, ví dụ ('h', 'ọ', 'c', '_')) xuất hiện trong toàn corpus — kết quả word_freqs này là input cho cả get_pair_freqs và merge_pair phía dưới. get_pair_freqs đếm cặp symbol liền kề theo tần suất từ (không phải theo số lần từ đó xuất hiện trong text thô — word_freqs đã gộp các từ trùng nhau lại kèm freq). merge_pair quét lại từng từ, hễ gặp đúng cặp pair thì nối 2 symbol thành 1, còn lại giữ nguyên. train_bpe lặp num_merges lần: mỗi lần lấy best_pair là cặp có tần suất cao nhất (max(..., key=pair_freqs.get)), lưu lại thành 1 merge rule, áp dụng gộp, rồi tính lại tần suất cặp trên trạng thái mới. Danh sách merges chính là "luật" của tokenizer — có thứ tự, áp dụng đúng thứ tự đó khi encode từ mới.
+
+Kết quả train trên corpus nhỏ
+
+Train 30 merge trên corpus 4 câu tiếng Việt ở đầu bài:
+
+Không có dòng code nào nói với thuật toán "học" là 1 từ tiếng Việt có nghĩa. BPE chỉ đếm tần suất: h và ọ đứng cạnh nhau nhiều lần trong corpus (do "học" xuất hiện lặp lại — "học sâu", "học máy", "học máy học sâu"), nên bị gộp trước thành họ; rồi họ và c lại đứng cạnh nhau nhiều, gộp tiếp thành học; rồi học và _ (ranh giới từ) gộp thành học_ — token đại diện cho đúng từ "học" đứng một mình cuối từ. Cả 5 merge rule đầu đều là hệ quả trực tiếp của thống kê tần suất trên corpus, không phải quy tắc ngôn ngữ được lập trình sẵn.
+
+Verify: round-trip encode → decode
+
+Áp merge rule theo đúng thứ tự đã học lên 1 từ mới (apply_bpe), map token sang id qua vocab đã sort, rồi decode ngược lại bằng cách nối token và đổi _ thành khoảng trắng:
+
+51 token đủ để cover mọi ký tự và subword xuất hiện trong corpus 4 câu — nhỏ, vì corpus nhỏ. encode cắt câu "học sâu là transformer" thành 5 token id; decode phải trả về đúng 100% chuỗi ký tự gốc, kể cả khoảng trắng giữa từ và dấu tiếng Việt. Đây không phải điều kiện tùy chọn — nếu round-trip lệch một ký tự, tokenizer có bug ở apply_bpe hoặc ở logic ghép _, và mọi thứ train trên tokenizer đó sau này đều sai theo. assert decoded == test_sentence trong script là chỗ bug đó bị bắt ngay, trước khi đi xa hơn.
+
+Từ token id đến embedding
+
+Token id chỉ là số thứ tự trong vocab — id 10 và id 13 không "gần nhau" hơn 10 và 33 theo nghĩa gì cả, đó là thứ tự do sorted() áp lên một set không có thứ tự tự nhiên. Đưa trực tiếp id vào model là vô nghĩa: model sẽ học sai rằng id lớn hơn "nhiều hơn" theo cách nào đó.
+
+Embedding table giải quyết việc đó: một ma trận (vocab_size, embed_dim), mỗi dòng là 1 vector học được cho đúng 1 token id. Lấy embedding của 1 token chỉ là tra bảng theo index — đây chính là việc torch.nn.Embedding làm trong code thật, viết thủ công bằng index tensor:
+
+5 token id tra ra 5 vector 8 chiều, ghép lại thành tensor (5, 8) — đây là hình dạng thật sẽ vào model transformer ở các bài sau, cộng thêm positional encoding như Bài 04 đã cài. embedding_table ở đây khởi tạo random (torch.randn) và không train — giá trị vector cụ thể không có ý nghĩa gì lúc này. Ý nghĩa chỉ xuất hiện sau khi embedding table được cập nhật qua training, để 2 token có ngữ nghĩa gần nhau dần có vector gần nhau.
+
+Tổng kết & bài tiếp theo
+
+Bài này cài đủ 2 bước bắt buộc trước khi text chạm vào bất kỳ layer transformer nào: BPE tokenizer (đếm tần suất cặp ký tự, gộp lặp lại thành vocab subword, verify round-trip encode/decode khớp 100%) và embedding lookup (tra bảng token id thành vector, hình dạng (seq_len, embed_dim) sẵn sàng cho attention). Không có bước nào ở đây dùng thư viện tokenizers — toàn bộ 30 merge rule và bảng vocab 51 token đều là kết quả tính tay trên corpus nhỏ.
+
+Có tokenizer và embedding table, vẫn còn thiếu phần quan trọng nhất: embedding table hiện tại là số random, chưa học được gì. Bài 06 sẽ nói về training loop, loss, và optimizer — cách những vector random này (và mọi trọng số khác trong model) được cập nhật qua từng bước training để dần mang ngữ nghĩa thật.
+
+Bài 05 kết thúc với một embedding table random, chưa học được gì. Cộng với attention ở bài 04 và backprop nhiều layer ở bài 02, model đã có đủ cấu trúc để nhận input là chữ và tính ra gradient cho mọi tham số. Vẫn còn thiếu đúng một mảnh: cách dùng gradient đó để thực sự cập nhật trọng số — hiệu quả, ổn định, qua hàng nghìn bước — chứ không chỉ w -= lr * w.grad một lần cho có. Đó là việc của loss function và optimizer, và đó là chủ đề bài cuối của sub-series Nền tảng.
+
+Loss function: CrossEntropyLoss cho bài toán ngôn ngữ
+
+Một model ngôn ngữ, tại mỗi vị trí trong sequence, không dự đoán ra 1 token — nó dự đoán ra một phân phối xác suất trên toàn bộ vocab (vocab 51 token như bài 05, hoặc vài chục nghìn token với tokenizer thật). Layer cuối là 1 linear layer chiếu về số chiều bằng vocab_size, các giá trị đó gọi là logits.
+
+CrossEntropyLoss đo khoảng cách giữa phân phối dự đoán đó và token thật (nhãn ground-truth): nó áp softmax lên logits để ra phân phối xác suất, rồi lấy log-xác suất mà model gán cho đúng token thật, đảo dấu. Loss thấp nghĩa là model gán xác suất cao cho token đúng; loss cao nghĩa là model gán xác suất thấp cho token đúng (dù có thể vẫn "tự tin" — nhưng tự tin sai). Trong script demo dưới đây, bài toán được rút gọn về phân loại nhị phân (2 class thay vì cả vocab) để dễ verify công thức optimizer bằng tay, nhưng cùng một nn.CrossEntropyLoss(), cùng một cơ chế, là thứ sẽ dùng nguyên vẹn khi loss được tính trên logits kích thước vocab_size ở sub-series train LLM thật.
+
+Vì sao không dùng SGD thuần, cần Adam/AdamW
+
+SGD (Stochastic Gradient Descent) thuần cập nhật mọi tham số bằng đúng 1 learning rate: w -= lr * w.grad. Vấn đề là loss landscape của một deep network không đồng đều — có chiều gradient dốc, có chiều gradient gần như bằng phẳng, và độ dốc đó khác nhau theo từng tham số, thậm chí thay đổi theo thời gian train. Một lr đủ nhỏ để không diverge ở chiều dốc sẽ học quá chậm ở chiều bằng phẳng; một lr đủ lớn để học nhanh ở chiều bằng phẳng sẽ làm chiều dốc dao động hoặc nổ.
+
+Adam giải quyết việc đó bằng cách giữ 2 trung bình động (exponential moving average) cho mỗi tham số riêng biệt:
+
+- m (first moment) — trung bình động của gradient, đóng vai trò momentum: hướng cập nhật được làm trơn qua nhiều step, giảm dao động do gradient nhiễu (mini-batch).
+- v (second moment) — trung bình động của gradient bình phương: ước lượng "mức độ lớn" gradient của tham số đó gần đây. Tham số có gradient lớn liên tục sẽ có v lớn, kéo bước cập nhật hiệu dụng nhỏ lại; tham số có gradient nhỏ liên tục thì ngược lại.
+
+Kết quả là mỗi tham số có một learning rate hiệu dụng riêng, tự điều chỉnh — đây gọi là adaptive learning rate per-parameter. Đó là lý do Adam hội tụ nhanh và ổn định hơn SGD thuần trên loss landscape phức tạp của deep network, và là optimizer mặc định cho hầu hết việc train transformer.
+
+AdamW: weight decay tách khỏi gradient
+
+Adam gốc thường đi kèm weight decay theo kiểu Adam+L2: cộng thêm weight_decay * p vào gradient trước khi đưa vào công thức Adam ở trên. Vấn đề là m và v — 2 trung bình động vừa nói — sẽ hấp thụ luôn phần weight decay đó, làm nó bị scale theo v_hat.sqrt() như thể nó là một phần gradient thật, thay vì là một lực kéo tham số về 0 độc lập với gradient.
+
+AdamW sửa việc đó: tách weight decay ra khỏi gradient, trừ trực tiếp lên tham số ở một bước riêng.
+
+Từng dòng: s["t"] += 1 tăng biến đếm step t, dùng cho bias correction ngay dưới. s["m"] là EMA của gradient với hệ số b1 = 0.9 — 90% giá trị cũ, 10% gradient mới. s["v"] là EMA của gradient bình phương với b2 = 0.999 — cập nhật chậm hơn m nhiều, vì nó ước lượng "quy mô" gradient nên cần mượt hơn. m_hat và v_hat là bias correction: ở các step đầu, m và v khởi tạo từ 0 nên bị lệch thấp (biased) một cách hệ thống — chia cho (1 - b1t) và (1 - b2t) sửa lại đúng giá trị kỳ vọng, ảnh hưởng lớn nhất ở vài step đầu và giảm dần khi t tăng (vì b1t, b2t tiến về 0). Dòng p.data -= lr * weight_decay * p.data là toàn bộ khác biệt của AdamW so với Adam — decay tỷ lệ trực tiếp với chính giá trị tham số, không đi qua m/v. Dòng cuối là bước Adam chuẩn: cập nhật tham số theo hướng m_hat, chia cho v_hat.sqrt() + eps (epsilon chống chia 0) để scale bước cập nhật ngược với độ lớn gradient gần đây.
+
+Verify: đối chiếu manual AdamW với torch.optim.AdamW
+
+Cài công thức bằng tay dễ sai — nhầm thứ tự bias correction, quên tách weight decay, hoặc lệch epsilon — nên verify bằng cách chạy 2 model giống nhau (cùng seed, cùng data) song song: một dùng manual_adamw_step, một dùng torch.optim.AdamW, rồi so sánh tham số sau 20 step:
+
+Loss giảm giống nhau tuyệt đối ở mọi step in ra — không có gì bất ngờ vì cả 2 model xuất phát từ cùng tham số và cùng gradient tại mỗi step. Điều đáng chú ý là dòng cuối: sau 20 step cập nhật độc lập (mỗi step đều tích lũy sai số dấu phẩy động khác nhau giữa 2 implementation), tham số của 2 model lệch nhau tối đa 2.98e-07 — nhỏ hơn 1e-5 yêu cầu, và ở mức sai số làm tròn float32 thông thường, không phải sai số công thức. manual_adamw_step cài đúng công thức AdamW mà torch.optim.AdamW dùng thật, không phải một xấp xỉ trông giống.
+
+LR schedule: warmup rồi cosine decay
+
+Learning rate cố định suốt quá trình train hiếm khi tối ưu. Ngay lúc bắt đầu, trọng số còn random (như embedding table ở bài 05), gradient tại đó có thể rất lớn hoặc rất nhiễu — cập nhật với lr đầy đủ ngay từ step 0 dễ đẩy tham số đi quá xa, làm loss tăng vọt hoặc diverge hẳn. Warmup giải quyết việc đó: tăng lr từ 0 lên base_lr dần trong vài chục/vài trăm step đầu, cho model "ổn định" trước khi học với tốc độ đầy đủ.
+
+Về cuối quá trình train, lr lớn khiến tham số dao động quanh điểm tối ưu thay vì hội tụ vào đó. Cosine decay giảm dần lr theo một đường cosine từ base_lr về gần 0 khi kết thúc — giảm nhanh ở giữa, chậm dần ở đầu và cuối đường cong, giúp hội tụ ổn định hơn so với giảm tuyến tính hoặc giữ nguyên.
+
+Với warmup_steps=10, lr tăng tuyến tính từ 0 ở step 0 đến đúng base_lr = 0.001 ở step 10 — đúng công thức base_lr * step / warmup_steps. Từ step 10 trở đi, progress chạy từ 0 đến 1 trên phần còn lại (total_steps - warmup_steps = 90 step), và lr giảm theo cos: gần như đi ngang lúc mới qua warmup (step 20: 0.000970, giảm rất ít so với 0.001), giảm nhanh ở đoạn giữa (step 40 → 60: từ 0.00075 xuống 0.000413), rồi chậm dần khi tiến về gần 0 ở cuối (step 90: 0.00003). Đây chính xác là hình dáng "warmup rồi cosine decay" chuẩn dùng để train transformer trong thực tế.
+
+Tổng kết series Nền tảng
+
+Sáu bài của sub-series Nền tảng, xếp lại thành một chuỗi khối xây dựng liền mạch: bài 01 cài tensor và autograd, verify PyTorch tính gradient đúng bằng cách đối chiếu với đạo hàm tính tay trên hồi quy tuyến tính. Bài 02 mở rộng sang backprop qua nhiều layer bằng chain rule, vẫn verify bằng tay. Bài 03 đo bằng benchmark thật vì sao attention thay thế RNN — không phải vì rẻ hơn về tính toán, mà vì song song hoá được. Bài 04 cài self-attention/multi-head attention từ đầu, đối chiếu sai số với torch.nn.MultiheadAttention. Bài 05 cài BPE tokenizer và embedding lookup, biến chữ thành vector mà attention đọc được. Bài này khép lại phần còn thiếu cuối cùng: loss function đo model sai bao nhiêu, và optimizer (AdamW, verify khớp torch.optim.AdamW với sai số 2.98e-07) cùng LR schedule (warmup + cosine decay) quyết định cập nhật trọng số thế nào để loss đó giảm dần, ổn định.
+
+Từ tensor và autograd đến attention, tokenizer, và giờ là optimizer — mọi khối xây dựng bắt buộc để tự cài và train một LLM nhỏ từ đầu đã có đủ, mỗi khối đều được verify bằng số thật, không chỉ tin vào lý thuyết. Sub-series tiếp theo, Tự train LLM từ đầu, sẽ ghép các khối này lại thành một quá trình train hoàn chỉnh trên corpus lớn hơn — bắt đầu từ việc chuẩn bị dữ liệu và train một tokenizer thật.

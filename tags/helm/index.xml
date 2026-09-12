@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Helm on Quy Duong Minh — Software Engineer</title><link>https://quydmfl.github.io/tags/helm/</link><description>Recent content in Helm on Quy Duong Minh — Software Engineer</description><generator>Hugo</generator><language>vi-VN</language><lastBuildDate>Tue, 24 Nov 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://quydmfl.github.io/tags/helm/index.xml" rel="self" type="application/rss+xml"/><item><title>04. Helm cơ bản</title><link>https://quydmfl.github.io/articles/homelab-k8s-series/04-helm-co-ban/</link><pubDate>Sun, 22 Nov 2026 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/articles/homelab-k8s-series/04-helm-co-ban/</guid><description>&lt;p&gt;&lt;a href="../03-yaml-manifests-thuan/"&gt;Bài 03&lt;/a&gt; viết tay &lt;code&gt;Deployment&lt;/code&gt;/&lt;code&gt;Service&lt;/code&gt;/&lt;code&gt;Ingress&lt;/code&gt;. Bài này đóng gói chính xác những manifest đó thành 1 Helm chart — công cụ package/template hoá phổ biến nhất cho Kubernetes.&lt;/p&gt;
+&lt;h2 id="cấu-trúc-1-chart-chartyaml-valuesyaml-templates"&gt;Cấu trúc 1 chart: Chart.yaml, values.yaml, templates/&lt;/h2&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;pre tabindex="0"&gt;&lt;code&gt;webapp/
+├── Chart.yaml
+├── values.yaml
+└── templates/
+ ├── deployment.yaml
+ ├── service.yaml
+ └── ingress.yaml&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;Chart.yaml&lt;/code&gt; chỉ chứa metadata (tên, version):&lt;/p&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-yaml" data-lang="yaml"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;apiVersion&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;v2&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;name&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;webapp&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;description&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;Chart demo cho series Homelab Kubernetes&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;type&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;application&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;version&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;0.1.0&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#f92672"&gt;appVersion&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;1.0.0&amp;#34;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;values.yaml&lt;/code&gt; — giá trị mặc định, tham số hoá đúng những gì đã hardcode ở bài 03:&lt;/p&gt;</description></item><item><title>06. Terraform + Helm provider</title><link>https://quydmfl.github.io/articles/homelab-k8s-series/06-terraform-helm-provider/</link><pubDate>Tue, 24 Nov 2026 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/articles/homelab-k8s-series/06-terraform-helm-provider/</guid><description>&lt;p&gt;Kết hợp &lt;a href="../04-helm-co-ban/"&gt;bài 04&lt;/a&gt; (Helm chart) và &lt;a href="../05-terraform-kubernetes-provider/"&gt;bài 05&lt;/a&gt; (Terraform quản lý cluster): dùng &lt;code&gt;helm&lt;/code&gt; provider của Terraform để chính Terraform gọi &lt;code&gt;helm install&lt;/code&gt;/&lt;code&gt;upgrade&lt;/code&gt; thay vì CLI thủ công — 1 state duy nhất mô tả toàn bộ trạng thái mong muốn của cluster.&lt;/p&gt;
+&lt;h2 id="provider-helm-cầu-nối-terraform--helm"&gt;provider &amp;ldquo;helm&amp;rdquo;: cầu nối Terraform → Helm&lt;/h2&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-hcl" data-lang="hcl"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;terraform&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;required_providers&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; kubernetes &lt;span style="color:#f92672"&gt;=&lt;/span&gt; { source &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &amp;#34;hashicorp/kubernetes&amp;#34;, version &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~&amp;gt; 2.31&amp;#34;&lt;/span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; helm &lt;span style="color:#f92672"&gt;=&lt;/span&gt; { source &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &amp;#34;hashicorp/helm&amp;#34;, version &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~&amp;gt; 2.15&amp;#34;&lt;/span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;provider&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kubernetes&amp;#34;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_path &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~/.kube/config&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kind-homelab&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;provider&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;helm&amp;#34;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;kubernetes&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_path &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~/.kube/config&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kind-homelab&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Chú ý cú pháp: &lt;code&gt;helm&lt;/code&gt; provider dùng &lt;strong&gt;block&lt;/strong&gt; &lt;code&gt;kubernetes { ... }&lt;/code&gt; (không có dấu &lt;code&gt;=&lt;/code&gt;) — khác với resource khác thường dùng &lt;code&gt;= {}&lt;/code&gt;. Nhầm cú pháp này báo lỗi &lt;code&gt;Unsupported argument&lt;/code&gt; ngay lúc &lt;code&gt;terraform validate&lt;/code&gt;.&lt;/p&gt;</description></item></channel></rss>

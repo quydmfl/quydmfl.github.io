@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Terraform on Quy Duong Minh — Software Engineer</title><link>https://quydmfl.github.io/tags/terraform/</link><description>Recent content in Terraform on Quy Duong Minh — Software Engineer</description><generator>Hugo</generator><language>vi-VN</language><lastBuildDate>Tue, 24 Nov 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://quydmfl.github.io/tags/terraform/index.xml" rel="self" type="application/rss+xml"/><item><title>05. Terraform + Kubernetes provider</title><link>https://quydmfl.github.io/articles/homelab-k8s-series/05-terraform-kubernetes-provider/</link><pubDate>Mon, 23 Nov 2026 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/articles/homelab-k8s-series/05-terraform-kubernetes-provider/</guid><description>&lt;p&gt;Từ bài này, chuyển dần từ &lt;code&gt;kubectl apply&lt;/code&gt;/&lt;code&gt;helm install&lt;/code&gt; thủ công sang quản lý bằng Terraform — mọi thay đổi cluster đi qua code, có lịch sử, có &lt;code&gt;plan&lt;/code&gt; trước khi &lt;code&gt;apply&lt;/code&gt;.&lt;/p&gt;
+&lt;h2 id="provider-kubernetes-kết-nối-tới-cluster-kind"&gt;provider &amp;ldquo;kubernetes&amp;rdquo;: kết nối tới cluster kind&lt;/h2&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-hcl" data-lang="hcl"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;terraform&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;required_providers&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; kubernetes &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; source &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;hashicorp/kubernetes&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; version &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~&amp;gt; 2.31&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;provider&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kubernetes&amp;#34;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_path &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~/.kube/config&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kind-homelab&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;terraform init&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;pre tabindex="0"&gt;&lt;code&gt;Terraform has created a lock file .terraform.lock.hcl to record the provider
+selections it made above...
+Terraform has been successfully initialized!&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;config_context = &amp;quot;kind-homelab&amp;quot;&lt;/code&gt; — chính context &lt;code&gt;kind&lt;/code&gt; đã tự ghi vào kubeconfig ở &lt;a href="../01-kind-cluster-setup/"&gt;bài 01&lt;/a&gt;, không cần cấu hình credential riêng gì thêm cho cluster local.&lt;/p&gt;</description></item><item><title>06. Terraform + Helm provider</title><link>https://quydmfl.github.io/articles/homelab-k8s-series/06-terraform-helm-provider/</link><pubDate>Tue, 24 Nov 2026 00:00:00 +0000</pubDate><guid>https://quydmfl.github.io/articles/homelab-k8s-series/06-terraform-helm-provider/</guid><description>&lt;p&gt;Kết hợp &lt;a href="../04-helm-co-ban/"&gt;bài 04&lt;/a&gt; (Helm chart) và &lt;a href="../05-terraform-kubernetes-provider/"&gt;bài 05&lt;/a&gt; (Terraform quản lý cluster): dùng &lt;code&gt;helm&lt;/code&gt; provider của Terraform để chính Terraform gọi &lt;code&gt;helm install&lt;/code&gt;/&lt;code&gt;upgrade&lt;/code&gt; thay vì CLI thủ công — 1 state duy nhất mô tả toàn bộ trạng thái mong muốn của cluster.&lt;/p&gt;
+&lt;h2 id="provider-helm-cầu-nối-terraform--helm"&gt;provider &amp;ldquo;helm&amp;rdquo;: cầu nối Terraform → Helm&lt;/h2&gt;
+&lt;div class="code-block"&gt;
+ &lt;button class="code-block__copy" type="button" data-copy-code data-copied-label="Copied"&gt;Copy&lt;/button&gt;
+ &lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"&gt;&lt;code class="language-hcl" data-lang="hcl"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;terraform&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;required_providers&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; kubernetes &lt;span style="color:#f92672"&gt;=&lt;/span&gt; { source &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &amp;#34;hashicorp/kubernetes&amp;#34;, version &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~&amp;gt; 2.31&amp;#34;&lt;/span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; helm &lt;span style="color:#f92672"&gt;=&lt;/span&gt; { source &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &amp;#34;hashicorp/helm&amp;#34;, version &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~&amp;gt; 2.15&amp;#34;&lt;/span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;provider&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kubernetes&amp;#34;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_path &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~/.kube/config&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kind-homelab&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;provider&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;helm&amp;#34;&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;kubernetes&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_path &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;~/.kube/config&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; config_context &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;kind-homelab&amp;#34;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Chú ý cú pháp: &lt;code&gt;helm&lt;/code&gt; provider dùng &lt;strong&gt;block&lt;/strong&gt; &lt;code&gt;kubernetes { ... }&lt;/code&gt; (không có dấu &lt;code&gt;=&lt;/code&gt;) — khác với resource khác thường dùng &lt;code&gt;= {}&lt;/code&gt;. Nhầm cú pháp này báo lỗi &lt;code&gt;Unsupported argument&lt;/code&gt; ngay lúc &lt;code&gt;terraform validate&lt;/code&gt;.&lt;/p&gt;</description></item></channel></rss>

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: webapp
+description: Chart demo cho series Homelab Kubernetes -- đóng gói đúng 3 manifest đã viết tay ở bài 03
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

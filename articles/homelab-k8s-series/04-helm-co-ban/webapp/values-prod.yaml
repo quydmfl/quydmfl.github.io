@@ -1,0 +1,6 @@
+replicaCount: 3
+image:
+  tag: latest
+ingress:
+  enabled: true
+  host: web-app.homelab.local

@@ -1,0 +1,395 @@
+<!doctype html><html lang=vi-VN><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>04. slack_gateway: domain & application · Quy Duong Minh — Software Engineer</title><meta name=description content="ReactionAddedEvent, business rule emoji→ngôn ngữ, HandleReactionUseCase orchestrate dedup+translate+reply — module gọi module khác CHỈ qua public port, verify bằng 6 test thật dùng stub, không cần Slack/LibreTranslate thật."><link rel=canonical href=https://quydmfl.github.io/articles/rust-slackbot-series/04-slack-gateway-domain-application/><meta property="og:title" content="04. slack_gateway: domain & application"><meta property="og:description" content="ReactionAddedEvent, business rule emoji→ngôn ngữ, HandleReactionUseCase orchestrate dedup+translate+reply — module gọi module khác CHỈ qua public port, verify bằng 6 test thật dùng stub, không cần Slack/LibreTranslate thật."><meta property="og:type" content="article"><meta property="og:url" content="https://quydmfl.github.io/articles/rust-slackbot-series/04-slack-gateway-domain-application/"><meta property="og:locale" content="vi_VN"><meta name=twitter:card content="summary_large_image"><meta property="article:published_time" content="2026-12-19T00:00:00Z"><link rel=preconnect href=https://fonts.googleapis.com><link rel=preconnect href=https://fonts.gstatic.com crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Outfit:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel=stylesheet><link rel=stylesheet href=/css/style.min.88d860f38556cf8145c270a41ae4038522761425b6c31bf6b48a6f67fd4150c9.css integrity="sha256-iNhg84VWz4FFwnCkGuQDhSJ2FCW2wxv2tIpvZ/1BUMk="><meta name=theme-color content="#FAFAF7"><link rel=icon href=/favicon.svg type=image/svg+xml><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"04. slack_gateway: domain \u0026 application","description":"ReactionAddedEvent, business rule emoji→ngôn ngữ, HandleReactionUseCase orchestrate dedup+translate+reply — module gọi module khác CHỈ qua public port, verify bằng 6 test thật dùng stub, không cần Slack/LibreTranslate thật.","url":"https://quydmfl.github.io/articles/rust-slackbot-series/04-slack-gateway-domain-application/","mainEntityOfPage":{"@type":"WebPage","@id":"https://quydmfl.github.io/articles/rust-slackbot-series/04-slack-gateway-domain-application/"},"inLanguage":"vi-VN","datePublished":"2026-12-19T00:00:00Z","author":{"@type":"Person","name":"Quy Duong Minh","url":"https://quydmfl.github.io/about/","sameAs":["https://github.com/quydmfl"]},"publisher":{"@type":"Person","name":"Quy Duong Minh","url":"https://quydmfl.github.io/"}}</script></head><body><a class=skip-link href=#main-content>Skip to content</a><header class=site-header><div class=container><a class=logo href=/><span class=logo__main>Quy Duong Minh — Software Engineer</span></a><div class=nav-shell><input class="nav__check visually-hidden" type=checkbox id=siteNavToggle aria-controls=siteNav aria-expanded=false>
+<label class=nav__toggle for=siteNavToggle><span class=visually-hidden>Open menu</span>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></label><nav class=nav id=siteNav aria-label="Primary navigation"><a class=nav__link href=/articles/>Articles</a>
+<a class=nav__link href=/series/>Series</a>
+<a class=nav__link href=/search/>Search</a>
+<a class=nav__link href=/tags/>Tags</a>
+<a class=nav__link href=/archives/>Archive</a>
+<a class=nav__link href=/about/>About</a></nav></div></div></header><main id=main-content><div class="post-layout has-toc"><article class=post><header class=post__header><div class=post__tag>Rust</div><h1 class=post__title>04. slack_gateway: domain & application</h1><div class=post__meta><time datetime=2026-12-19>Dec 19, 2026</time>
+<span aria-hidden=true>·</span>
+<span>15 min read</span></div></header><aside class=series-box><p class=series-box__eyebrow>Series ·
+<a href=/series/x%C3%A2y-slack-bot-b%E1%BA%B1ng-rust/>Xây Slack Bot bằng Rust</a></p><ol class=series-box__list><li class=series-box__item><a href=/articles/rust-slackbot-series/01-kien-truc-tong-quan/>01. Kiến trúc tổng quan</a></li><li class=series-box__item><a href=/articles/rust-slackbot-series/02-kernel-shared-types/>02. kernel: shared kernel</a></li><li class=series-box__item><a href=/articles/rust-slackbot-series/03-module-translation/>03. Module translation trọn vẹn</a></li><li class="series-box__item is-current"><span class=series-box__current>04. slack_gateway: domain & application</span></li><li class=series-box__item><a href=/articles/rust-slackbot-series/05-slack-gateway-bao-mat-http/>05. slack_gateway: bảo mật & HTTP layer</a></li><li class=series-box__item><a href=/articles/rust-slackbot-series/06-slack-gateway-goi-slack-api/>06. slack_gateway: gọi Slack Web API</a></li><li class=series-box__item><a href=/articles/rust-slackbot-series/07-composition-root-test-docker/>07. Composition root, test, Docker</a></li></ol></aside><style>.series-box{margin-block:0 2rem;padding:1.1rem 1.25rem;border:.09375rem solid var(--line);border-radius:var(--radius);background:var(--paper-2);box-shadow:var(--shadow-hard)}.series-box__eyebrow{margin:0 0 .6rem;font-family:var(--font-mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}.series-box__eyebrow a{color:var(--accent-dark);text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.15em}.series-box__list{margin:0;padding:0;list-style:none;counter-reset:series-item;display:flex;flex-direction:column;gap:.35rem}.series-box__item{counter-increment:series-item;padding-inline-start:1.6rem;position:relative;line-height:1.4}.series-box__item::before{content:counter(series-item)".";position:absolute;left:0;color:var(--muted);font-family:var(--font-mono);font-size:.85rem}.series-box__item a{color:var(--ink);text-decoration:none;border-bottom:.09375rem solid transparent}.series-box__item a:hover{border-color:var(--line)}.series-box__item.is-current .series-box__current{font-weight:600;color:var(--accent-dark)}</style><div class=post__body><p><a href=../03-module-translation/>Bài 03</a> khép lại module <code>translation</code> với đúng 1 API công khai: <code>translation::application::TranslateText</code>. Consumer nào cần dịch chỉ cần gọi <code>execute()</code> qua trait đó, không cần biết bên dưới là LibreTranslate hay provider nào khác. Bài này xây module thứ 2, module thật sự <strong>gọi</strong> <code>TranslateText</code>: <code>slack_gateway</code> — nơi phản ứng emoji trên Slack (reaction) biến thành 1 bản dịch trả lời trong thread. Cũng như <code>translation</code>, module này đủ 3 lớp <code>domain</code>/<code>application</code>/<code>infrastructure</code>; bài hôm nay dừng ở 2 lớp đầu, để lại <code>infrastructure</code> (HTTP nhận request thật từ Slack, bảo mật request signature) cho bài 05/06.</p><h2 id=domain-decouple-khỏi-wire-format-của-slack>Domain: decouple khỏi wire format của Slack</h2><p><code>crates/slack_gateway/src/domain/event.rs</code>:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-rust data-lang=rust><span style=display:flex><span><span style=color:#e6db74>/// Domain representation of a `reaction_added` Slack event — decoupled from
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// Slack&#39;s actual wire format (see `infrastructure::dto` for that mapping).
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#[derive(Debug, Clone)]</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>struct</span> <span style=color:#a6e22e>ReactionAddedEvent</span> {
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>/// Slack&#39;s emoji *short name* (e.g. `&#34;flag-vn&#34;`), not the unicode glyph —
+</span></span></span><span style=display:flex><span>    <span style=color:#e6db74>/// that&#39;s what the Events API actually sends in the `reaction` field.
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> emoji: String,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> channel: String,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> message_ts: String,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> reacting_user: String,
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div><p><code>crates/slack_gateway/src/domain/message.rs</code>:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-rust data-lang=rust><span style=display:flex><span><span style=color:#e6db74>/// A Slack message fetched from a channel — just enough of it for translation.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#[derive(Debug, Clone)]</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>struct</span> <span style=color:#a6e22e>SlackMessage</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> channel: String,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> ts: String,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> text: String,
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> user: Option<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;</span>,
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div><p><code>crates/slack_gateway/src/domain/mod.rs</code>:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-rust data-lang=rust><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>mod</span> emoji_lang;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>mod</span> event;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>mod</span> message;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>use</span> event::ReactionAddedEvent;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>use</span> message::SlackMessage;</span></span></code></pre></div></div><p>Docstring trên <code>ReactionAddedEvent</code> nói thẳng điều quan trọng nhất của file này: đây là kiểu dữ liệu <strong>của riêng <code>slack_gateway</code></strong>, không phải struct map thẳng JSON mà Slack Events API trả về. Việc định nghĩa các kiểu wire-format khớp đúng JSON Slack gửi (<code>SlackEventPayload</code>, <code>SlackEvent</code>, <code>ReactionAddedDto</code>&mldr;) là việc của <code>infrastructure::dto</code>, sẽ viết ở bài 06 — chưa tồn tại ở bài này. Còn việc map thật sự từ các DTO đó sang <code>ReactionAddedEvent</code> domain lại nằm ở <code>infrastructure::http::handlers</code>, viết ở bài 05 — <code>dto.rs</code> chỉ định nghĩa hình dạng dữ liệu, không tự làm phép map đó. Cùng lý do, <code>SlackMessage</code> chỉ giữ đúng 4 field module này cần để dịch (<code>channel</code>, <code>ts</code>, <code>text</code>, <code>user</code>), không phải toàn bộ shape message thật Slack Web API trả về (có timestamp, có attachment, có block kit, &mldr;).</p><p>Cái lợi của việc tách này: nếu Slack đổi format API — đổi tên field, thêm field mới, đổi cấu trúc JSON — chỉ file mapping ở <code>infrastructure</code> cần sửa. <code>ReactionAddedEvent</code>, <code>SlackMessage</code>, và mọi thứ dùng chúng ở <code>application</code> (<code>HandleReactionUseCase</code>) không biết và không cần biết chuyện đó xảy ra. Đây là cùng nguyên tắc domain-không-biết-infra đã thấy ở <code>translation</code> bài 03, áp dụng lại cho module thứ 2.</p><p>Một chi tiết dễ bỏ qua nhưng quan trọng, nằm ngay trong docstring của field <code>emoji</code>: giá trị đây là <em>short name</em> dạng <code>"flag-vn"</code>, không phải glyph unicode 🇻🇳. Slack Events API thực sự gửi short name trong field <code>reaction</code>, không gửi emoji hiển thị — quyết định thiết kế này ảnh hưởng trực tiếp tới business rule ở phần tiếp theo.</p><h2 id=business-rule-emoji_lang>Business rule: <code>emoji_lang</code></h2><p><code>crates/slack_gateway/src/domain/emoji_lang.rs</code>:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-rust data-lang=rust><span style=display:flex><span><span style=color:#66d9ef>use</span> kernel::LanguageCode;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>/// Business rule: which flag-emoji reaction triggers translation into which
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// language. Slack&#39;s `reaction_added` event carries the emoji&#39;s *short name*
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// (e.g. `&#34;flag-vn&#34;`), not the unicode glyph, so this table matches against
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// short names. Deliberately a small curated set rather than every ISO
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// territory flag — extend as needed.
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#66d9ef>EMOJI_LANGUAGE_TABLE</span>: <span style=color:#66d9ef>&amp;</span>[(<span style=color:#f92672>&amp;</span><span style=color:#66d9ef>str</span>, <span style=color:#f92672>&amp;</span><span style=color:#66d9ef>str</span>)] <span style=color:#f92672>=</span> <span style=color:#f92672>&amp;</span>[
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-vn&#34;</span>, <span style=color:#e6db74>&#34;vi&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-us&#34;</span>, <span style=color:#e6db74>&#34;en&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-gb&#34;</span>, <span style=color:#e6db74>&#34;en&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-england&#34;</span>, <span style=color:#e6db74>&#34;en&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-scotland&#34;</span>, <span style=color:#e6db74>&#34;en&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-jp&#34;</span>, <span style=color:#e6db74>&#34;ja&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-kr&#34;</span>, <span style=color:#e6db74>&#34;ko&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-cn&#34;</span>, <span style=color:#e6db74>&#34;zh&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-fr&#34;</span>, <span style=color:#e6db74>&#34;fr&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-de&#34;</span>, <span style=color:#e6db74>&#34;de&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-es&#34;</span>, <span style=color:#e6db74>&#34;es&#34;</span>),
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#34;flag-th&#34;</span>, <span style=color:#e6db74>&#34;th&#34;</span>),
+</span></span><span style=display:flex><span>];
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>language_for_emoji</span>(emoji: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>) -&gt; Option<span style=color:#f92672>&lt;</span>LanguageCode<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>EMOJI_LANGUAGE_TABLE</span>
+</span></span><span style=display:flex><span>        .iter()
+</span></span><span style=display:flex><span>        .find(<span style=color:#f92672>|</span>(short_name, _)<span style=color:#f92672>|</span> <span style=color:#f92672>*</span>short_name <span style=color:#f92672>==</span> emoji)
+</span></span><span style=display:flex><span>        .and_then(<span style=color:#f92672>|</span>(_, code)<span style=color:#f92672>|</span> LanguageCode::new(<span style=color:#f92672>*</span>code).ok())
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#[cfg(test)]</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>mod</span> tests {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> <span style=color:#66d9ef>super</span>::<span style=color:#f92672>*</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[test]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>maps_known_flags</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>assert_eq!</span>(language_for_emoji(<span style=color:#e6db74>&#34;flag-vn&#34;</span>).unwrap().as_str(), <span style=color:#e6db74>&#34;vi&#34;</span>);
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>assert_eq!</span>(language_for_emoji(<span style=color:#e6db74>&#34;flag-gb&#34;</span>).unwrap().as_str(), <span style=color:#e6db74>&#34;en&#34;</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[test]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>ignores_unknown_reactions</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>assert!</span>(language_for_emoji(<span style=color:#e6db74>&#34;thumbsup&#34;</span>).is_none());
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div><p><code>EMOJI_LANGUAGE_TABLE</code> là bảng tra cứu tĩnh, khớp đúng lý do đã nêu ở phần trước: khoá tra cứu là short name (<code>"flag-vn"</code>, <code>"flag-jp"</code>, &mldr;), không phải glyph unicode. Đây là 1 quyết định nghiệp vụ có chủ đích, không phải liệt kê đầy đủ mọi lá cờ ISO tồn tại — docstring nói rõ &ldquo;deliberately a small curated set&rdquo;, chỉ 12 mục, thêm quốc gia mới là thêm 1 dòng vào bảng. Đáng chú ý: 3 short name khác nhau (<code>flag-gb</code>, <code>flag-england</code>, <code>flag-scotland</code>) cùng map về <code>"en"</code> — phản ánh đúng thực tế Slack có nhiều emoji cờ khác nhau cho cùng 1 khối ngôn ngữ.</p><p><code>language_for_emoji</code> tìm trong bảng bằng short name, rồi chuyển string ngôn ngữ (<code>"vi"</code>, <code>"en"</code>, &mldr;) qua <code>LanguageCode::new()</code> — validate lại bằng type từ <code>kernel</code> (bài 02), không trả thẳng <code>&amp;str</code>. Trả về <code>Option&lt;LanguageCode></code>: <code>None</code> nếu emoji không có trong bảng, đây là con đường phổ biến nhất trong thực tế — hầu hết reaction trên Slack là <code>thumbsup</code>, <code>eyes</code>, <code>heart</code>, không phải cờ nào cả.</p><p>2 test tại chỗ xác nhận đúng 2 nhánh của hàm: <code>maps_known_flags</code> kiểm tra map đúng (<code>flag-vn</code> → <code>vi</code>, <code>flag-gb</code> → <code>en</code>), <code>ignores_unknown_reactions</code> kiểm tra emoji không có trong bảng (<code>thumbsup</code>) trả về <code>None</code> chứ không panic. Chạy thật:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>cd /path/to/slackbot
+</span></span><span style=display:flex><span>cargo test -p slack_gateway domain:: -- --test-threads<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span></span></span></code></pre></div></div><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><pre tabindex=0><code>    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (target/debug/deps/slack_gateway-932ee089e0e6ac9a)
+
+running 2 tests
+test domain::emoji_lang::tests::ignores_unknown_reactions ... ok
+test domain::emoji_lang::tests::maps_known_flags ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s</code></pre></div><p><code>8 filtered out</code> gồm 4 test application (mục tiếp theo trong chính bài này) + 3 test dedup + 1 test http (sẽ gặp ở bài 05/06) — bộ lọc <code>domain::</code> chỉ chạy test trong module <code>domain</code>.</p><h2 id=application-2-port-outbound>Application: 2 port outbound</h2><p><code>crates/slack_gateway/src/application/ports.rs</code>:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-rust data-lang=rust><span style=display:flex><span><span style=color:#66d9ef>use</span> async_trait::async_trait;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>use</span> <span style=color:#66d9ef>crate</span>::domain::SlackMessage;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#[derive(Debug, thiserror::Error)]</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>enum</span> <span style=color:#a6e22e>SlackApiError</span> {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[error(</span><span style=color:#e6db74>&#34;slack api request failed: {0}&#34;</span><span style=color:#75715e>)]</span>
+</span></span><span style=display:flex><span>    RequestFailed(String),
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[error(</span><span style=color:#e6db74>&#34;slack api returned an error: {0}&#34;</span><span style=color:#75715e>)]</span>
+</span></span><span style=display:flex><span>    ApiError(String),
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[error(</span><span style=color:#e6db74>&#34;message not found: channel={channel} ts={ts}&#34;</span><span style=color:#75715e>)]</span>
+</span></span><span style=display:flex><span>    MessageNotFound { channel: String, ts: String },
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>/// Outbound port: everything this module needs from the Slack Web API.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// Implemented by `infrastructure::SlackWebApiClient`; a test double can
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// implement this trait directly for use-case-level tests without any HTTP.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#[async_trait]</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>trait</span> SlackMessagingPort: Send <span style=color:#f92672>+</span> Sync {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>fetch_message</span>(<span style=color:#f92672>&amp;</span>self, channel: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>, ts: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>) -&gt; Result<span style=color:#f92672>&lt;</span>SlackMessage, SlackApiError<span style=color:#f92672>&gt;</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>post_thread_reply</span>(
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&amp;</span>self,
+</span></span><span style=display:flex><span>        channel: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>,
+</span></span><span style=display:flex><span>        thread_ts: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>,
+</span></span><span style=display:flex><span>        text: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>,
+</span></span><span style=display:flex><span>    ) -&gt; Result<span style=color:#f92672>&lt;</span>(), SlackApiError<span style=color:#f92672>&gt;</span>;
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>/// Outbound port: prevents translating (and replying to) the same
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// message+language combination twice — e.g. several people reacting with the
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// same flag emoji, or Slack retrying a webhook delivery it thinks timed out.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#[async_trait]</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>trait</span> DedupCachePort: Send <span style=color:#f92672>+</span> Sync {
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>/// Attempts to claim `key`. Returns `true` if this call is the first to
+</span></span></span><span style=display:flex><span>    <span style=color:#e6db74>/// claim it (caller should proceed), `false` if it&#39;s already claimed and
+</span></span></span><span style=display:flex><span>    <span style=color:#e6db74>/// still within its TTL (caller should skip).
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>try_claim</span>(<span style=color:#f92672>&amp;</span>self, key: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>) -&gt; <span style=color:#66d9ef>bool</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>/// Releases a previously claimed key — call this after a failed attempt
+</span></span></span><span style=display:flex><span>    <span style=color:#e6db74>/// so a transient error doesn&#39;t permanently block retries.
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>release</span>(<span style=color:#f92672>&amp;</span>self, key: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>);
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div><p>2 outbound port, cả 2 đều để <code>HandleReactionUseCase</code> không biết chi tiết triển khai bên dưới.</p><p><code>SlackMessagingPort</code> gói mọi thao tác module này cần từ Slack Web API: lấy nội dung message (<code>fetch_message</code>) và trả lời trong thread (<code>post_thread_reply</code>). Docstring nói rõ ai sẽ implement trait này thật — <code>infrastructure::SlackWebApiClient</code>, ở bài 06, gọi HTTP thật tới Slack — nhưng cũng nói rõ điều quan trọng hơn cho bài hôm nay: 1 test double có thể implement thẳng trait này để test use case mà không cần HTTP nào cả. <code>SlackApiError</code> liệt kê 3 cách việc gọi Slack có thể thất bại, kể cả trường hợp cụ thể <code>MessageNotFound</code> — đủ chi tiết để phân biệt lỗi mạng chung chung với lỗi &ldquo;message này không còn tồn tại&rdquo;.</p><p><code>DedupCachePort</code> giải quyết 1 vấn đề thực tế: nhiều người có thể react cùng 1 lá cờ vào cùng 1 message, hoặc Slack tự retry gửi lại webhook nếu nghĩ lần gửi trước timeout — cả 2 trường hợp đều không nên tạo ra 2 bản dịch, 2 reply trùng nhau. <code>try_claim</code> trả <code>true</code> nếu đây là lần đầu tiên claim khoá đó (nên tiếp tục xử lý), <code>false</code> nếu đã bị claim và còn trong TTL (nên bỏ qua). <code>release</code> là nửa còn lại: nhả khoá ra khi có lỗi tạm thời, để không khoá vĩnh viễn 1 message chỉ vì 1 lần Slack API hoặc translation provider bị lỗi thoáng qua.</p><p>Cả 2 port đều chưa có implementation thật ở bài này — <code>infrastructure::SlackWebApiClient</code> cho <code>SlackMessagingPort</code>, và 1 adapter dựa trên cache (Redis hoặc in-memory với TTL) cho <code>DedupCachePort</code> — đều để dành cho bài 06.</p><h2 id=handlereactionusecase-orchestration-thật><code>HandleReactionUseCase</code>: orchestration thật</h2><p><code>crates/slack_gateway/src/application/handle_reaction.rs</code> (phần logic, chưa tính test):</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-rust data-lang=rust><span style=display:flex><span><span style=color:#66d9ef>use</span> std::sync::Arc;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>use</span> kernel::LanguageCode;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>use</span> tracing::{debug, info};
+</span></span><span style=display:flex><span><span style=color:#66d9ef>use</span> translation::application::{TranslateText, TranslateTextCommand};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>use</span> <span style=color:#66d9ef>crate</span>::application::ports::{DedupCachePort, SlackApiError, SlackMessagingPort};
+</span></span><span style=display:flex><span><span style=color:#66d9ef>use</span> <span style=color:#66d9ef>crate</span>::domain::{emoji_lang, ReactionAddedEvent};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>/// Orchestrates the one thing this bot does today: a flag-emoji reaction on a
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// message triggers fetching that message, translating it via the
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// `translation` module&#39;s public port, and replying in-thread with the
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// result. This is the only place the two modules meet — and they meet only
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>/// through `TranslateText`, never through `translation::infrastructure`.
+</span></span></span><span style=display:flex><span><span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>struct</span> <span style=color:#a6e22e>HandleReactionUseCase</span> {
+</span></span><span style=display:flex><span>    slack: <span style=color:#a6e22e>Arc</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>dyn</span> SlackMessagingPort<span style=color:#f92672>&gt;</span>,
+</span></span><span style=display:flex><span>    translator: <span style=color:#a6e22e>Arc</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>dyn</span> TranslateText<span style=color:#f92672>&gt;</span>,
+</span></span><span style=display:flex><span>    dedup: <span style=color:#a6e22e>Arc</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>dyn</span> DedupCachePort<span style=color:#f92672>&gt;</span>,
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>impl</span> HandleReactionUseCase {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>new</span>(
+</span></span><span style=display:flex><span>        slack: <span style=color:#a6e22e>Arc</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>dyn</span> SlackMessagingPort<span style=color:#f92672>&gt;</span>,
+</span></span><span style=display:flex><span>        translator: <span style=color:#a6e22e>Arc</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>dyn</span> TranslateText<span style=color:#f92672>&gt;</span>,
+</span></span><span style=display:flex><span>        dedup: <span style=color:#a6e22e>Arc</span><span style=color:#f92672>&lt;</span><span style=color:#66d9ef>dyn</span> DedupCachePort<span style=color:#f92672>&gt;</span>,
+</span></span><span style=display:flex><span>    ) -&gt; <span style=color:#a6e22e>Self</span> {
+</span></span><span style=display:flex><span>        Self {
+</span></span><span style=display:flex><span>            slack,
+</span></span><span style=display:flex><span>            translator,
+</span></span><span style=display:flex><span>            dedup,
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>pub</span> <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>execute</span>(<span style=color:#f92672>&amp;</span>self, event: <span style=color:#a6e22e>ReactionAddedEvent</span>) -&gt; Result<span style=color:#f92672>&lt;</span>(), SlackApiError<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> Some(target_lang) <span style=color:#f92672>=</span> emoji_lang::language_for_emoji(<span style=color:#f92672>&amp;</span>event.emoji) <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>            <span style=color:#75715e>// Not a flag emoji we recognize — silently ignore. Expected for
+</span></span></span><span style=display:flex><span>            <span style=color:#75715e>// the vast majority of reactions (thumbsup, eyes, ...).
+</span></span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span> Ok(());
+</span></span><span style=display:flex><span>        };
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// One reply per (message, target language), no matter how many
+</span></span></span><span style=display:flex><span>        <span style=color:#75715e>// people react with the same flag or how many times Slack retries
+</span></span></span><span style=display:flex><span>        <span style=color:#75715e>// delivering the webhook.
+</span></span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> dedup_key <span style=color:#f92672>=</span> <span style=color:#a6e22e>format!</span>(<span style=color:#e6db74>&#34;</span><span style=color:#e6db74>{}</span><span style=color:#e6db74>:</span><span style=color:#e6db74>{}</span><span style=color:#e6db74>:</span><span style=color:#e6db74>{}</span><span style=color:#e6db74>&#34;</span>, event.channel, event.message_ts, target_lang);
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> <span style=color:#f92672>!</span>self.dedup.try_claim(<span style=color:#f92672>&amp;</span>dedup_key).<span style=color:#66d9ef>await</span> {
+</span></span><span style=display:flex><span>            <span style=color:#a6e22e>debug!</span>(key <span style=color:#f92672>=</span> <span style=color:#f92672>%</span>dedup_key, <span style=color:#e6db74>&#34;duplicate reaction, skipping&#34;</span>);
+</span></span><span style=display:flex><span>            <span style=color:#66d9ef>return</span> Ok(());
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> result <span style=color:#f92672>=</span> self.translate_and_reply(<span style=color:#f92672>&amp;</span>event, <span style=color:#f92672>&amp;</span>target_lang).<span style=color:#66d9ef>await</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> result.is_err() {
+</span></span><span style=display:flex><span>            <span style=color:#75715e>// Don&#39;t let a transient failure (Slack API hiccup, translation
+</span></span></span><span style=display:flex><span>            <span style=color:#75715e>// provider down) permanently block a retry.
+</span></span></span><span style=display:flex><span>            self.dedup.release(<span style=color:#f92672>&amp;</span>dedup_key).<span style=color:#66d9ef>await</span>;
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        result
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>translate_and_reply</span>(
+</span></span><span style=display:flex><span>        <span style=color:#f92672>&amp;</span>self,
+</span></span><span style=display:flex><span>        event: <span style=color:#66d9ef>&amp;</span><span style=color:#a6e22e>ReactionAddedEvent</span>,
+</span></span><span style=display:flex><span>        target_lang: <span style=color:#66d9ef>&amp;</span><span style=color:#a6e22e>LanguageCode</span>,
+</span></span><span style=display:flex><span>    ) -&gt; Result<span style=color:#f92672>&lt;</span>(), SlackApiError<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> message <span style=color:#f92672>=</span> self
+</span></span><span style=display:flex><span>            .slack
+</span></span><span style=display:flex><span>            .fetch_message(<span style=color:#f92672>&amp;</span>event.channel, <span style=color:#f92672>&amp;</span>event.message_ts)
+</span></span><span style=display:flex><span>            .<span style=color:#66d9ef>await</span><span style=color:#f92672>?</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> translation <span style=color:#f92672>=</span> self
+</span></span><span style=display:flex><span>            .translator
+</span></span><span style=display:flex><span>            .execute(TranslateTextCommand {
+</span></span><span style=display:flex><span>                text: <span style=color:#a6e22e>message</span>.text,
+</span></span><span style=display:flex><span>                target_lang: <span style=color:#a6e22e>target_lang</span>.clone(),
+</span></span><span style=display:flex><span>                source_lang: None,
+</span></span><span style=display:flex><span>            })
+</span></span><span style=display:flex><span>            .<span style=color:#66d9ef>await</span>
+</span></span><span style=display:flex><span>            .map_err(<span style=color:#f92672>|</span>e<span style=color:#f92672>|</span> SlackApiError::ApiError(e.to_string()))<span style=color:#f92672>?</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>info!</span>(
+</span></span><span style=display:flex><span>            channel <span style=color:#f92672>=</span> <span style=color:#f92672>%</span>event.channel,
+</span></span><span style=display:flex><span>            ts <span style=color:#f92672>=</span> <span style=color:#f92672>%</span>event.message_ts,
+</span></span><span style=display:flex><span>            target_lang <span style=color:#f92672>=</span> <span style=color:#f92672>%</span>target_lang,
+</span></span><span style=display:flex><span>            <span style=color:#e6db74>&#34;posting translation&#34;</span>
+</span></span><span style=display:flex><span>        );
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        self.slack
+</span></span><span style=display:flex><span>            .post_thread_reply(<span style=color:#f92672>&amp;</span>event.channel, <span style=color:#f92672>&amp;</span>event.message_ts, <span style=color:#f92672>&amp;</span>translation.translated_text)
+</span></span><span style=display:flex><span>            .<span style=color:#66d9ef>await</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div><p><code>HandleReactionUseCase</code> giữ đúng 3 field, cả 3 đều là trait object đứng sau <code>Arc</code>: <code>slack: Arc&lt;dyn SlackMessagingPort></code>, <code>translator: Arc&lt;dyn TranslateText></code>, <code>dedup: Arc&lt;dyn DedupCachePort></code>. Cùng công thức dependency inversion đã thấy ở <code>TranslateTextUseCase</code> bài 03 — use case chỉ biết 3 trait, không biết implementation cụ thể nào đứng sau chúng.</p><p>Chú ý field <code>translator</code> có kiểu <code>Arc&lt;dyn TranslateText></code> — chính là inbound port của module <code>translation</code>, chứ không phải <code>TranslationProviderPort</code> hay bất cứ thứ gì từ <code>translation::infrastructure</code>. Docstring trên struct nói thẳng: &ldquo;they meet only through <code>TranslateText</code>, never through <code>translation::infrastructure</code>&rdquo;. Đây là ranh giới module được tôn trọng đúng như thiết kế ở bài 03 — <code>slack_gateway</code> không biết, và không cần biết, <code>translation</code> đang dùng LibreTranslate hay provider nào khác.</p><p><code>execute()</code> đi qua từng bước theo đúng thứ tự:</p><ol><li><strong>Lọc emoji hợp lệ.</strong> <code>emoji_lang::language_for_emoji(&amp;event.emoji)</code> trả <code>None</code> thì return <code>Ok(())</code> ngay, im lặng bỏ qua — không phải lỗi, chỉ là phần lớn reaction không phải cờ.</li><li><strong>Tạo dedup key.</strong> Format <code>{channel}:{message_ts}:{target_lang}</code> — chú ý key gồm cả <code>target_lang</code>, không chỉ <code>channel:message_ts</code>. Cùng 1 message bị react bởi 2 lá cờ khác nhau (ví dụ <code>flag-vn</code> và <code>flag-jp</code>) vẫn tạo ra 2 key khác nhau, nên dịch ra 2 ngôn ngữ khác nhau không bị coi là trùng.</li><li><strong>Claim dedup.</strong> <code>self.dedup.try_claim(&amp;dedup_key).await</code> trả <code>false</code> thì return <code>Ok(())</code> ngay, log ở mức <code>debug</code>. Đây là điểm chặn request trùng trước khi tốn bất cứ lệnh gọi mạng nào.</li><li><strong>Fetch message</strong> qua <code>self.slack.fetch_message(...)</code>. Lỗi ở bước này propagate thẳng ra bằng <code>?</code>.</li><li><strong>Gọi <code>translator.execute()</code></strong> — đúng và chỉ đúng <code>TranslateText</code>, gói tham số vào <code>TranslateTextCommand</code> với <code>source_lang: None</code> (để <code>translation</code> tự phát hiện ngôn ngữ nguồn, như đã thấy ở <code>LibreTranslateAdapter</code> bài 03). Lỗi translation (<code>TranslationError</code>) được map sang <code>SlackApiError::ApiError</code> — 2 module có 2 loại lỗi riêng, việc map lỗi này là chỗ duy nhất <code>slack_gateway</code> &ldquo;nhìn thấy&rdquo; <code>translation</code> có thể lỗi.</li><li><strong>Reply</strong> bằng <code>post_thread_reply</code>.</li><li><strong>Xử lý lỗi transient bằng cách release dedup key.</strong> Nếu <code>translate_and_reply</code> trả lỗi ở bất cứ bước nào (fetch, translate, hay reply), <code>execute()</code> gọi <code>self.dedup.release(&amp;dedup_key).await</code> trước khi trả lỗi ra ngoài. Không làm vậy thì 1 lần Slack API hoặc LibreTranslate hiccup tạm thời sẽ khoá vĩnh viễn message đó — không ai react lại được nữa vì key coi như &ldquo;đã xử lý&rdquo;.</li></ol><p>Toàn bộ logic nghiệp vụ đáng test nằm gọn trong 1 hàm <code>execute()</code> khoảng 20 dòng, không phụ thuộc gì ngoài 3 trait.</p><h2 id=test-bằng-stub-tự-viết-không-cần-network>Test bằng stub tự viết, không cần network</h2><p><code>crates/slack_gateway/src/application/handle_reaction.rs</code>, module test:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-rust data-lang=rust><span style=display:flex><span><span style=color:#75715e>#[cfg(test)]</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>mod</span> tests {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> <span style=color:#66d9ef>super</span>::<span style=color:#f92672>*</span>;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> async_trait::async_trait;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> std::collections::HashSet;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> std::sync::atomic::{AtomicUsize, Ordering};
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> std::sync::Mutex;
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> translation::domain::{Translation, TranslationError};
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>use</span> <span style=color:#66d9ef>crate</span>::domain::SlackMessage;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> <span style=color:#a6e22e>StubSlack</span> {
+</span></span><span style=display:flex><span>        post_count: <span style=color:#a6e22e>AtomicUsize</span>,
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[async_trait]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>impl</span> SlackMessagingPort <span style=color:#66d9ef>for</span> StubSlack {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>fetch_message</span>(<span style=color:#f92672>&amp;</span>self, channel: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>, ts: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>) -&gt; Result<span style=color:#f92672>&lt;</span>SlackMessage, SlackApiError<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>            Ok(SlackMessage {
+</span></span><span style=display:flex><span>                channel: <span style=color:#a6e22e>channel</span>.to_string(),
+</span></span><span style=display:flex><span>                ts: <span style=color:#a6e22e>ts</span>.to_string(),
+</span></span><span style=display:flex><span>                text: <span style=color:#e6db74>&#34;hello&#34;</span>.to_string(),
+</span></span><span style=display:flex><span>                user: Some(<span style=color:#e6db74>&#34;U1&#34;</span>.to_string()),
+</span></span><span style=display:flex><span>            })
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>post_thread_reply</span>(
+</span></span><span style=display:flex><span>            <span style=color:#f92672>&amp;</span>self,
+</span></span><span style=display:flex><span>            _channel: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>,
+</span></span><span style=display:flex><span>            _thread_ts: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>,
+</span></span><span style=display:flex><span>            _text: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>,
+</span></span><span style=display:flex><span>        ) -&gt; Result<span style=color:#f92672>&lt;</span>(), SlackApiError<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>            self.post_count.fetch_add(<span style=color:#ae81ff>1</span>, Ordering::SeqCst);
+</span></span><span style=display:flex><span>            Ok(())
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> <span style=color:#a6e22e>StubTranslator</span>;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[async_trait]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>impl</span> TranslateText <span style=color:#66d9ef>for</span> StubTranslator {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>execute</span>(<span style=color:#f92672>&amp;</span>self, cmd: <span style=color:#a6e22e>TranslateTextCommand</span>) -&gt; Result<span style=color:#f92672>&lt;</span>Translation, TranslationError<span style=color:#f92672>&gt;</span> {
+</span></span><span style=display:flex><span>            Ok(Translation {
+</span></span><span style=display:flex><span>                original_text: <span style=color:#a6e22e>cmd</span>.text.clone(),
+</span></span><span style=display:flex><span>                translated_text: <span style=color:#a6e22e>format</span><span style=color:#f92672>!</span>(<span style=color:#e6db74>&#34;[{}] {}&#34;</span>, cmd.target_lang, cmd.text),
+</span></span><span style=display:flex><span>                source_lang: None,
+</span></span><span style=display:flex><span>                target_lang: <span style=color:#a6e22e>cmd</span>.target_lang,
+</span></span><span style=display:flex><span>            })
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>/// A minimal in-memory stand-in for `DedupCachePort`, kept local to this
+</span></span></span><span style=display:flex><span>    <span style=color:#e6db74>/// test module so application-layer tests don&#39;t reach into infrastructure.
+</span></span></span><span style=display:flex><span>    <span style=color:#66d9ef>struct</span> <span style=color:#a6e22e>StubDedup</span> {
+</span></span><span style=display:flex><span>        claimed: <span style=color:#a6e22e>Mutex</span><span style=color:#f92672>&lt;</span>HashSet<span style=color:#f92672>&lt;</span>String<span style=color:#f92672>&gt;&gt;</span>,
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>impl</span> StubDedup {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>new</span>() -&gt; <span style=color:#a6e22e>Self</span> {
+</span></span><span style=display:flex><span>            Self {
+</span></span><span style=display:flex><span>                claimed: <span style=color:#a6e22e>Mutex</span>::new(HashSet::new()),
+</span></span><span style=display:flex><span>            }
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[async_trait]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>impl</span> DedupCachePort <span style=color:#66d9ef>for</span> StubDedup {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>try_claim</span>(<span style=color:#f92672>&amp;</span>self, key: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>) -&gt; <span style=color:#66d9ef>bool</span> {
+</span></span><span style=display:flex><span>            self.claimed.lock().unwrap().insert(key.to_string())
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>release</span>(<span style=color:#f92672>&amp;</span>self, key: <span style=color:#66d9ef>&amp;</span><span style=color:#66d9ef>str</span>) {
+</span></span><span style=display:flex><span>            self.claimed.lock().unwrap().remove(key);
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>reaction_event</span>() -&gt; <span style=color:#a6e22e>ReactionAddedEvent</span> {
+</span></span><span style=display:flex><span>        ReactionAddedEvent {
+</span></span><span style=display:flex><span>            emoji: <span style=color:#e6db74>&#34;flag-vn&#34;</span>.to_string(),
+</span></span><span style=display:flex><span>            channel: <span style=color:#e6db74>&#34;C1&#34;</span>.to_string(),
+</span></span><span style=display:flex><span>            message_ts: <span style=color:#e6db74>&#34;123.456&#34;</span>.to_string(),
+</span></span><span style=display:flex><span>            reacting_user: <span style=color:#e6db74>&#34;U1&#34;</span>.to_string(),
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[tokio::test]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>ignores_reactions_that_are_not_a_mapped_flag</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> slack <span style=color:#f92672>=</span> Arc::new(StubSlack {
+</span></span><span style=display:flex><span>            post_count: <span style=color:#a6e22e>AtomicUsize</span>::new(<span style=color:#ae81ff>0</span>),
+</span></span><span style=display:flex><span>        });
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> use_case <span style=color:#f92672>=</span> HandleReactionUseCase::new(
+</span></span><span style=display:flex><span>            slack.clone(),
+</span></span><span style=display:flex><span>            Arc::new(StubTranslator),
+</span></span><span style=display:flex><span>            Arc::new(StubDedup::new()),
+</span></span><span style=display:flex><span>        );
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> <span style=color:#66d9ef>mut</span> event <span style=color:#f92672>=</span> reaction_event();
+</span></span><span style=display:flex><span>        event.emoji <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;thumbsup&#34;</span>.to_string();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        use_case.execute(event).<span style=color:#66d9ef>await</span>.unwrap();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>assert_eq!</span>(slack.post_count.load(Ordering::SeqCst), <span style=color:#ae81ff>0</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[tokio::test]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>translates_and_replies_once_per_message_and_language</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> slack <span style=color:#f92672>=</span> Arc::new(StubSlack {
+</span></span><span style=display:flex><span>            post_count: <span style=color:#a6e22e>AtomicUsize</span>::new(<span style=color:#ae81ff>0</span>),
+</span></span><span style=display:flex><span>        });
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> use_case <span style=color:#f92672>=</span> HandleReactionUseCase::new(
+</span></span><span style=display:flex><span>            slack.clone(),
+</span></span><span style=display:flex><span>            Arc::new(StubTranslator),
+</span></span><span style=display:flex><span>            Arc::new(StubDedup::new()),
+</span></span><span style=display:flex><span>        );
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        use_case.execute(reaction_event()).<span style=color:#66d9ef>await</span>.unwrap();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>assert_eq!</span>(slack.post_count.load(Ordering::SeqCst), <span style=color:#ae81ff>1</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[tokio::test]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>skips_duplicate_reactions_to_the_same_message_and_language</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> slack <span style=color:#f92672>=</span> Arc::new(StubSlack {
+</span></span><span style=display:flex><span>            post_count: <span style=color:#a6e22e>AtomicUsize</span>::new(<span style=color:#ae81ff>0</span>),
+</span></span><span style=display:flex><span>        });
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> use_case <span style=color:#f92672>=</span> HandleReactionUseCase::new(
+</span></span><span style=display:flex><span>            slack.clone(),
+</span></span><span style=display:flex><span>            Arc::new(StubTranslator),
+</span></span><span style=display:flex><span>            Arc::new(StubDedup::new()),
+</span></span><span style=display:flex><span>        );
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#75715e>// Two different users reacting with the same flag to the same message.
+</span></span></span><span style=display:flex><span>        use_case.execute(reaction_event()).<span style=color:#66d9ef>await</span>.unwrap();
+</span></span><span style=display:flex><span>        use_case.execute(reaction_event()).<span style=color:#66d9ef>await</span>.unwrap();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>assert_eq!</span>(slack.post_count.load(Ordering::SeqCst), <span style=color:#ae81ff>1</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>#[tokio::test]</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>async</span> <span style=color:#66d9ef>fn</span> <span style=color:#a6e22e>does_not_dedup_across_different_target_languages</span>() {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> slack <span style=color:#f92672>=</span> Arc::new(StubSlack {
+</span></span><span style=display:flex><span>            post_count: <span style=color:#a6e22e>AtomicUsize</span>::new(<span style=color:#ae81ff>0</span>),
+</span></span><span style=display:flex><span>        });
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> use_case <span style=color:#f92672>=</span> HandleReactionUseCase::new(
+</span></span><span style=display:flex><span>            slack.clone(),
+</span></span><span style=display:flex><span>            Arc::new(StubTranslator),
+</span></span><span style=display:flex><span>            Arc::new(StubDedup::new()),
+</span></span><span style=display:flex><span>        );
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        use_case.execute(reaction_event()).<span style=color:#66d9ef>await</span>.unwrap();
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>let</span> <span style=color:#66d9ef>mut</span> other_lang_event <span style=color:#f92672>=</span> reaction_event();
+</span></span><span style=display:flex><span>        other_lang_event.emoji <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;flag-jp&#34;</span>.to_string();
+</span></span><span style=display:flex><span>        use_case.execute(other_lang_event).<span style=color:#66d9ef>await</span>.unwrap();
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>assert_eq!</span>(slack.post_count.load(Ordering::SeqCst), <span style=color:#ae81ff>2</span>);
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div><p>3 stub, mỗi stub implement thẳng 1 trong 3 trait <code>HandleReactionUseCase</code> phụ thuộc — không có gì khác trong test module này chạm tới HTTP hay filesystem:</p><ul><li><code>StubSlack</code> implement <code>SlackMessagingPort</code>. <code>fetch_message</code> luôn trả về 1 <code>SlackMessage</code> cố định với text <code>"hello"</code>. <code>post_thread_reply</code> không thật sự gửi gì đi — chỉ tăng <code>post_count</code> (một <code>AtomicUsize</code>, an toàn gọi từ nhiều task async cùng lúc) để test sau này assert được đã reply bao nhiêu lần.</li><li><code>StubTranslator</code> implement <code>TranslateText</code> — chính là inbound port của <code>translation</code>, không phải <code>TranslationProviderPort</code>. Trả về ngay 1 <code>Translation</code> giả, ghép chuỗi <code>"[{target_lang}] {text}"</code>, không gọi LibreTranslate hay bất cứ provider thật nào.</li><li><code>StubDedup</code> implement <code>DedupCachePort</code> bằng 1 <code>HashSet&lt;String></code> bọc trong <code>Mutex</code>, sống hoàn toàn trong bộ nhớ tiến trình test. Docstring trên struct nói rõ lý do đặt nó cục bộ trong module test này: để test tầng application không phải với tới <code>infrastructure</code>.</li></ul><p>4 test lần lượt xác nhận đúng các nhánh logic đã liệt kê ở phần trước:</p><ul><li><code>ignores_reactions_that_are_not_a_mapped_flag</code>: emoji <code>thumbsup</code> không map được ngôn ngữ nào → <code>post_count</code> vẫn là <code>0</code>, use case return sớm ở bước lọc emoji, không đụng tới <code>dedup</code>, <code>slack</code>, hay <code>translator</code>.</li><li><code>translates_and_replies_once_per_message_and_language</code>: đường đi thành công đầy đủ, 1 reaction hợp lệ → <code>post_count = 1</code>.</li><li><code>skips_duplicate_reactions_to_the_same_message_and_language</code>: gọi <code>execute</code> 2 lần với cùng 1 event (mô phỏng 2 người react cùng lá cờ vào cùng message, hoặc Slack gửi lại webhook) → <code>post_count</code> vẫn là <code>1</code>, không phải <code>2</code> — dedup hoạt động đúng.</li><li><code>does_not_dedup_across_different_target_languages</code>: cùng message nhưng 2 emoji khác nhau (<code>flag-vn</code> rồi <code>flag-jp</code>) → <code>post_count = 2</code> — dedup key gồm cả <code>target_lang</code> nên không chặn nhầm 2 ngôn ngữ khác nhau của cùng 1 message.</li></ul><p>Chạy thật:</p><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-bash data-lang=bash><span style=display:flex><span>cd /path/to/slackbot
+</span></span><span style=display:flex><span>cargo test -p slack_gateway application:: -- --test-threads<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span></span></span></code></pre></div></div><div class=code-block><button class=code-block__copy type=button data-copy-code data-copied-label=Copied>Copy</button><pre tabindex=0><code>    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (target/debug/deps/slack_gateway-932ee089e0e6ac9a)
+
+running 4 tests
+test application::handle_reaction::tests::does_not_dedup_across_different_target_languages ... ok
+test application::handle_reaction::tests::ignores_reactions_that_are_not_a_mapped_flag ... ok
+test application::handle_reaction::tests::skips_duplicate_reactions_to_the_same_message_and_language ... ok
+test application::handle_reaction::tests::translates_and_replies_once_per_message_and_language ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s</code></pre></div><p><code>6 filtered out</code> là 2 test domain (<code>emoji_lang</code>) cộng thêm test khác đã có sẵn trong crate nằm ngoài bộ lọc <code>application::</code>.</p><p>Đây chính là lợi ích thật của kiến trúc port/adapter, không phải lý thuyết suông: toàn bộ luồng nghiệp vụ — lọc emoji, dedup theo key, orchestration fetch → translate → reply, xử lý lỗi transient bằng release — được test đầy đủ trong <code>0.00s</code>, không cần Slack Web API thật, không cần LibreTranslate chạy, không cần mạng, không cần mock framework hay HTTP interceptor nào. 3 struct Rust bình thường, mỗi struct implement đúng 1 trait, là đủ.</p><h2 id=tổng-kết--bài-tiếp-theo>Tổng kết & bài tiếp theo</h2><p><code>slack_gateway</code> bài này có domain thuần Rust (<code>ReactionAddedEvent</code>, <code>SlackMessage</code>, đều decouple khỏi wire format Slack thật) cộng 1 business rule nhỏ (<code>emoji_lang</code>, tra cứu theo short name chứ không phải glyph unicode), và application với 2 outbound port (<code>SlackMessagingPort</code>, <code>DedupCachePort</code>) cộng 1 use case (<code>HandleReactionUseCase</code>) nối chúng lại với <code>translation::application::TranslateText</code> — đúng và chỉ đúng qua trait đó, chưa bao giờ chạm <code>translation::infrastructure</code>. 6 test thật (2 domain + 4 application), toàn bộ chạy bằng stub, xác nhận cả business rule lẫn orchestration hoạt động đúng.</p><p>Cả <code>SlackMessagingPort</code> và <code>DedupCachePort</code> vẫn chưa có implementation thật — không có adapter nào gọi Slack Web API thật, không có cache TTL thật. <a href=../05-slack-gateway-bao-mat-http/>Bài 05</a> chuyển sang phần còn thiếu: tầng HTTP thật sự nhận request từ Slack, và bảo mật — verify request signature để chắc chắn request đến từ Slack chứ không phải ai đó giả mạo webhook.</p></div><nav class=post-nav aria-label="Article navigation"><a class=post-nav__link href=/articles/rust-slackbot-series/05-slack-gateway-bao-mat-http/><span>Previous</span><strong>05. slack_gateway: bảo mật & HTTP layer</strong></a>
+<a class="post-nav__link post-nav__link--next" href=/articles/rust-slackbot-series/03-module-translation/><span>Next</span><strong>03. Module translation trọn vẹn</strong></a></nav><section class=related aria-labelledby=related-title><h2 id=related-title class=related__title>Related articles</h2><div class=related__grid><a class="post-card post-card--related is-text-only" href=/articles/rust-slackbot-series/03-module-translation/><div class=post-card__body><div class=post-card__tag>Rust</div><h2 class=post-card__title>03. Module translation trọn vẹn</h2><p class=post-card__excerpt>Domain (Translation, TranslationError) → port outbound/inbound (async-trait) → use case → LibreTranslateAdapter. …</p><div class=post-card__meta><time datetime=2026-12-18>Dec 18, 2026</time>
+<span aria-hidden=true>·</span>
+<span>11 min read</span></div></div></a><a class="post-card post-card--related is-text-only" href=/articles/rust-slackbot-series/02-kernel-shared-types/><div class=post-card__body><div class=post-card__tag>Rust</div><h2 class=post-card__title>02. kernel: shared kernel</h2><p class=post-card__excerpt>AppConfig load từ env với thiserror, LanguageCode — value object tự validate ở constructor — và vì sao shared kernel …</p><div class=post-card__meta><time datetime=2026-12-17>Dec 17, 2026</time>
+<span aria-hidden=true>·</span>
+<span>11 min read</span></div></div></a><a class="post-card post-card--related is-text-only" href=/articles/rust-slackbot-series/01-kien-truc-tong-quan/><div class=post-card__body><div class=post-card__tag>Rust</div><h2 class=post-card__title>01. Kiến trúc tổng quan</h2><p class=post-card__excerpt>Cargo workspace 4 crate, modular monolith theo bounded context, Clean Architecture rút gọn (domain → application → …</p><div class=post-card__meta><time datetime=2026-12-16>Dec 16, 2026</time>
+<span aria-hidden=true>·</span>
+<span>9 min read</span></div></div></a></div></section></article><aside class=post-toc><details open><summary>On this page</summary><nav id=TableOfContents><ul><li><a href=#domain-decouple-khỏi-wire-format-của-slack>Domain: decouple khỏi wire format của Slack</a></li><li><a href=#business-rule-emoji_lang>Business rule: <code>emoji_lang</code></a></li><li><a href=#application-2-port-outbound>Application: 2 port outbound</a></li><li><a href=#handlereactionusecase-orchestration-thật><code>HandleReactionUseCase</code>: orchestration thật</a></li><li><a href=#test-bằng-stub-tự-viết-không-cần-network>Test bằng stub tự viết, không cần network</a></li><li><a href=#tổng-kết--bài-tiếp-theo>Tổng kết & bài tiếp theo</a></li></ul></nav></details></aside></div></main><footer class=site-footer><div class=container><div class=footer__top><div class=footer__brand><span class=footer__word>Quy Duong Minh — Software Engineer</span>
+<span class=footer__tag>Field-tested engineering notes</span><ul class=footer__social aria-label="Social links"><li><a class=footer__social-link href=https://github.com/quydmfl aria-label=GitHub title=GitHub><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 19c-4.3 1.3-4.3-2.2-6-2.7M15 22v-3.5c0-1 .1-1.4-.5-2 3.3-.4 6.8-1.6 6.8-7.3A5.7 5.7.0 0019.8 5a5.3 5.3.0 00-.1-4s-1.2-.4-4.2 1.5a14.4 14.4.0 00-7 0C5.5.6 4.3 1 4.3 1a5.3 5.3.0 00-.1 4A5.7 5.7.0 002.7 9.2c0 5.7 3.5 6.9 6.8 7.3-.5.5-.6 1.1-.5 2V22"/></svg></a></li><li><a class=footer__social-link href=/index.xml aria-label=RSS title=RSS><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="5" cy="19" r="1" fill="currentColor"/><path d="M4 11a9 9 0 019 9M4 4a16 16 0 0116 16"/></svg></a></li></ul></div><div class=footer__cols><div class=footer__col><span class=footer__col-head>Site</span>
+<a class=footer__link href=/articles/>Articles</a><a class=footer__link href=/series/>Series</a><a class=footer__link href=/search/>Search</a><a class=footer__link href=/tags/>Tags</a><a class=footer__link href=/archives/>Archive</a><a class=footer__link href=/about/>About</a></div><div class=footer__col><span class=footer__col-head>Follow</span>
+<a class=footer__link href=https://github.com/quydmfl target=_blank rel="noopener noreferrer">GitHub</a>
+<a class=footer__link href=/index.xml>RSS</a></div></div></div><div class=footer__bottom><span class=footer__colophon>Powered by <a href=https://gohugo.io/>Hugo</a> and the <a href=https://github.com/myimilo/hugo-theme-stacknote>Stacknote</a> theme</span>
+<span class=footer__copy>© 2026 Quy Duong Minh — Software Engineer · All rights reserved</span></div></div></footer><script src=/js/main.min.3166e75211275a582b467ea3ea420cbe843ec53a6a89cdab5be5f593a2c6457c.js integrity="sha256-MWbnUhEnWlgrRn6j6kIMvoQ+xTpqic2rW+X1k6LGRXw=" defer></script></body></html>
